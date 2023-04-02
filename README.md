@@ -55,22 +55,6 @@ $ python run_transfer.py
 In our study, we evaluate the transferability of algorithms by evaluating the search results (on CIFAR-10) on CIFAR-100 and ImageNet16-120 (for NAS-Bench-201 only).
 
 ```--path_pre_results``` must contain the search results at NAS201-C10 or MacroNAS-C10 problems.
-## Results in paper
-MacroNAS             |
-:-------------------------:|
-![](assets/MacroNAS.png)  |
-
-NAS-Bench-101             |
-:-------------------------:|
-![](assets/NAS101.png)  |
-
-NAS-Bench-201             |
-:-------------------------:|
-![](assets/NAS201.png)|
-
-NAS-Bench-ASR            |
-:-------------------------:|
-![](assets/NAS-ASR.png)  |
 
 ## Acknowledgement
 Our source code is inspired by:
