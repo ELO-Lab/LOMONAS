@@ -1,0 +1,3 @@
+pymoo==0.6.0
+fvcore==0.1.5post20220119
+absl_py==0.12.0
