@@ -1,12 +1,14 @@
 from algorithms.MOLS import Algorithm
 from utils import check_valid
 from utils import get_hashKey
-from utils import Individual
+from utils import Individual, ElitistArchive
 import numpy as np
+import pickle as p
 import time
 from copy import deepcopy
 from pymoo.util.nds.non_dominated_sorting import NonDominatedSorting
-
+from utils import visualize_IGD_value_and_nEvals, visualize_HV_value_and_nEvals
+from utils import visualize_Elitist_Archive_and_Pareto_Front
 
 def sample(arch_history, problem):
     while True:
@@ -195,8 +197,12 @@ class LOMONAS(Algorithm):
         self.get_all_neighbors = False
         self.local_search_on_all_sols = True
 
+        self.IGD_search_history = []
+        self.HV_search_history = []
+
     def _reset(self):
-        pass
+        self.IGD_search_history = []
+        self.HV_search_history = []
 
     def _setup(self):
         attr_perf_metric = self.f0.split('_')
@@ -352,7 +358,13 @@ class LOMONAS(Algorithm):
                     is_continue = False
                     break
                 if self.debug:
+                    print(f'-------------------------------------------------------------')
+                    print(f'-> IGD (search): {self.IGD_search_history[-1]}')
+                    print(f'-> IGD (evaluation): {self.IGD_evaluate_history[-1]}')
+                    print(f'-> HV (search): {self.HV_search_history[-1]}')
+                    print(f'-> HV (evaluation): {self.HV_evaluate_history[-1]}')
                     print(f'-> nEvals / maxEvals: {self.nEvals}/{self.problem.maxEvals}')
+                    print()
 
         self.finalize()
         results = {
@@ -363,10 +375,77 @@ class LOMONAS(Algorithm):
         return results
 
     def log_elitist_archive(self, **kwargs):
-        pass
+        E_Archive_evaluate = ElitistArchive(log_each_change=False)
+
+        self.nEvals_history.append(self.nEvals)
+
+        EA_search = {
+            'X': self.E_Archive_search.X.copy(),
+            'hashKey': self.E_Archive_search.hashKey.copy(),
+            'F': self.E_Archive_search.F.copy(),
+        }
+        self.E_Archive_search_history.append(EA_search)
+
+        """  In practice, these below steps are unworkable """
+        # Evaluation Step (to visualize the trend of IGD, do not affect the process of NAS search)
+        dummy_idv = Individual()
+        ## Evaluate each architecture in the Elitist Archive
+        for arch in EA_search['X']:
+            X = arch
+            test_error = self.problem.get_test_performance(arch=X)
+            efficiency_metric = self.problem.get_efficiency_metric(arch=X)
+            F = test_error + efficiency_metric
+            dummy_idv.set('X', X)
+            dummy_idv.set('F', F)
+            E_Archive_evaluate.update(dummy_idv, problem_name=self.problem.name)
+
+        ## Calculate the IGD indicator.
+        ## In practice, these steps are unworkable because we do not have the Pareto-optimal front
+        approximation_front = np.array(E_Archive_evaluate.F)
+        approximation_front = np.unique(approximation_front, axis=0)
+
+        IGD_value_evaluate = self.problem.calculate_IGD(approximation_front=approximation_front)
+        HV_value_evaluate = self.problem.calculate_HV(approximation_front=approximation_front)
+        self.IGD_evaluate_history.append(IGD_value_evaluate)
+        self.HV_evaluate_history.append(HV_value_evaluate)
+
+        approximation_front_val = np.array(EA_search['F'])
+        approximation_front_val = np.unique(approximation_front_val, axis=0)
+
+        IGD_value_search = self.problem.calculate_IGD_val(approximation_front=approximation_front_val)
+        HV_value_search = self.problem.calculate_HV(approximation_front=approximation_front_val)
+        self.IGD_search_history.append(IGD_value_search)
+        self.HV_search_history.append(HV_value_search)
+
+        EA_evaluate = {
+            'X': E_Archive_evaluate.X.copy(),
+            'hashKey': E_Archive_evaluate.hashKey.copy(),
+            'F': E_Archive_evaluate.F.copy()
+        }
+        self.E_Archive_evaluate_history.append(EA_evaluate)
 
     def _finalize(self):
-        pass
+        p.dump([self.nEvals_history, self.IGD_search_history],
+               open(f'{self.path_results}/#Evals_and_IGD_search.p', 'wb'))
+        p.dump([self.nEvals_history, self.HV_search_history],
+               open(f'{self.path_results}/#Evals_and_HV_search.p', 'wb'))
+
+        visualize_Elitist_Archive_and_Pareto_Front(AF=self.E_Archive_search_history[-1]['F'],
+                                                   POF=self.problem.opt_pareto_front_val,
+                                                   ylabel='Val Performance',
+                                                   xlabel=self.problem.objective_1,
+                                                   path=self.path_results,
+                                                   fig_name='approximation_front_search.jpg')
+
+        visualize_IGD_value_and_nEvals(IGD_history=self.IGD_search_history,
+                                       nEvals_history=self.nEvals_history,
+                                       path_results=self.path_results,
+                                       fig_name='/#Evals-IGD_search.jpg')
+
+        visualize_HV_value_and_nEvals(HV_history=self.HV_search_history,
+                                      nEvals_history=self.nEvals_history,
+                                      path_results=self.path_results,
+                                      fig_name='/#Evals-HV_search.jpg')
 
 #####################################################################################
 def seeking(X_list, F_list):

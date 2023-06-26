@@ -21,6 +21,10 @@ class API:
         keyData = arch_2_key(arch)
         return self.api['200'][keyData]['train_loss'][iepoch - 1], self.get_training_time(keyData=keyData, iepoch=iepoch)
 
+    def get_val_loss(self, arch, iepoch=-1):
+        keyData = arch_2_key(arch)
+        return self.api['200'][keyData]['val_loss'][iepoch - 1], self.get_training_time(keyData=keyData, iepoch=iepoch)
+
     def get_val_accuracy(self, arch, iepoch=-1):
         keyData = arch_2_key(arch)
         return self.api['200'][keyData]['val_acc'][iepoch - 1], self.get_training_time(keyData=keyData, iepoch=iepoch)

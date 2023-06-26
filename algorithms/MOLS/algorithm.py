@@ -1,8 +1,13 @@
 from utils import (
     set_seed,
-    ElitistArchive
+    ElitistArchive,
+    visualize_Elitist_Archive_and_Pareto_Front,
+    visualize_IGD_value_and_nEvals,
+    visualize_HV_value_and_nEvals
 )
 
+import numpy as np
+import pickle as p
 
 class Algorithm:
     def __init__(self, **kwargs):
@@ -27,6 +32,8 @@ class Algorithm:
         self.debug = False
 
         self.E_Archive_search = ElitistArchive(log_each_change=True)
+        self.E_Archive_search_each_gen = []
+        self.E_Archive_search_history = []
 
         ##############################################################################
         self.start_executed_time_algorithm = 0.0
@@ -37,6 +44,14 @@ class Algorithm:
         self.indicator_time_history = [0.0]
         self.evaluated_time_history = [0.0]
         self.running_time_history = [0.0]
+
+        self.nEvals_history = []
+
+        self.E_Archive_evaluate_history = []
+        self.IGD_evaluate_history = []
+        self.HV_evaluate_history = []
+
+        self.E_Archive_evaluate_each_gen = []
 
     """ ---------------------------------- Setting Up ---------------------------------- """
     def set_hyperparameters(self, **kwargs):
@@ -50,6 +65,7 @@ class Algorithm:
         self.path_results = None
 
         self.E_Archive_search = ElitistArchive(log_each_change=True)
+        self.E_Archive_search_history = []
 
         self.start_executed_time_algorithm = 0.0
         self.finish_executed_time_algorithm = 0.0
@@ -59,6 +75,13 @@ class Algorithm:
         self.indicator_time_history = [0.0]
         self.evaluated_time_history = [0.0]
         self.running_time_history = [0.0]
+
+        self.nEvals_history = []
+
+        self.E_Archive_evaluate_history = []
+
+        self.IGD_evaluate_history = []
+        self.HV_evaluate_history = []
 
         self._reset()
 
@@ -86,6 +109,31 @@ class Algorithm:
 
     """ --------------------------------------------------- Finalize ----------------------------------------------- """
     def finalize(self):
+        p.dump([self.nEvals_history, self.IGD_evaluate_history],
+               open(f'{self.path_results}/#Evals_and_IGD.p', 'wb'))
+        p.dump([self.nEvals_history, self.HV_evaluate_history],
+               open(f'{self.path_results}/#Evals_and_HV.p', 'wb'))
+
+        self.running_time_history = np.array(self.running_time_history)[1:]
+        p.dump(self.running_time_history, open(f'{self.path_results}/running_time.p', 'wb'))
+
+        p.dump([self.nEvals_history, self.E_Archive_search_history],
+               open(f'{self.path_results}/#Evals_and_Elitist_Archive_search.p', 'wb'))
+        p.dump([self.nEvals_history, self.E_Archive_evaluate_history],
+               open(f'{self.path_results}/#Evals_and_Elitist_Archive_evaluate.p', 'wb'))
+
+        visualize_Elitist_Archive_and_Pareto_Front(AF=self.E_Archive_evaluate_history[-1]['F'],
+                                                   POF=self.problem.opt_pareto_front,
+                                                   ylabel='Test Performance',
+                                                   xlabel=self.problem.objective_1,
+                                                   path=self.path_results)
+
+        visualize_IGD_value_and_nEvals(IGD_history=self.IGD_evaluate_history,
+                                       nEvals_history=self.nEvals_history,
+                                       path_results=self.path_results)
+        visualize_HV_value_and_nEvals(HV_history=self.HV_evaluate_history,
+                                      nEvals_history=self.nEvals_history,
+                                      path_results=self.path_results)
         self._finalize()
 
     """ -------------------------------------------- Abstract Methods -----------------------------------------------"""

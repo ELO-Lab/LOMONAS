@@ -2,7 +2,8 @@ from .IGD import calculate_IGD_value
 from .elitist_archive import ElitistArchive
 from .compare import find_the_better
 
-from .log_results import visualize_archive
+from .log_results import visualize_archive, visualize_Elitist_Archive_and_Pareto_Front
+from .log_results import visualize_HV_value_and_nEvals, visualize_IGD_value_and_nEvals
 
 from .utils import (
     set_seed,

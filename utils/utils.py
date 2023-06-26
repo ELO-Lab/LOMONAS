@@ -1,6 +1,5 @@
 import numpy as np
 import random
-import torch
 
 from .compare import find_the_better
 from api_benchmarks.api_101 import wrap_api as api
@@ -87,12 +86,6 @@ def get_hashKey(arch, problem_name):
 def set_seed(seed):
     np.random.seed(seed)
     random.seed(seed)
-    torch.manual_seed(seed)
-    if torch.cuda.is_available():
-        torch.backends.cudnn.benchmark = False
-        torch.backends.cudnn.enabled = True
-        torch.backends.cudnn.deterministic = True
-        torch.cuda.manual_seed_all(seed)
 
 def get_front_0(F):
     l = len(F)
