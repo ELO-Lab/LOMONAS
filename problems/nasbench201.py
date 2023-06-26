@@ -39,8 +39,8 @@ class NASBench201(Problem):
         self.available_ops = [0, 1, 2, 3, 4]
         self.maxLength = 6
 
-        self.data_path = kwargs['path_api_benchmark'] + f'/NASBench201'
-        self.pareto_opt_front_path = kwargs['path_pareto_optimal_front']
+        self.path_data = kwargs['api_benchmark_path'] + f'/NASBench201'
+        self.pof_path = kwargs['pof_path']
 
         self.min_FLOPs, self.max_FLOPs = None, None
 
@@ -57,7 +57,7 @@ class NASBench201(Problem):
             raise ValueError(f'Just only supported these subsets: CIFAR-10; CIFAR-100; ImageNet16-120.'
                              f'{self.dataset} subset is not supported at this time.')
 
-        self.api = API(data_path=self.data_path, dataset=self.dataset)
+        self.api = API(path_data=self.path_data, dataset=self.dataset)
 
         if self.dataset == 'CIFAR-10':
             self.min_FLOPs, self.max_FLOPs = 7.78305, 220.11969
@@ -66,7 +66,7 @@ class NASBench201(Problem):
         else:
             self.min_FLOPs, self.max_FLOPs = 1.95340, 55.03756
 
-        f_opt_pareto_front = open(f'{self.pareto_opt_front_path}/[POF_TestAcc_FLOPs]_[NAS201_{self.dataset}].p', 'rb')
+        f_opt_pareto_front = open(f'{self.pof_path}/[POF_TestAcc_FLOPs]_[NAS201_{self.dataset}].p', 'rb')
         self.opt_pareto_front = p.load(f_opt_pareto_front)
         self.opt_pareto_front[:, 0] /= 100
         f_opt_pareto_front.close()
@@ -76,7 +76,7 @@ class NASBench201(Problem):
             (self.opt_pareto_front_norm[:, 1] - self.min_FLOPs) / (self.max_FLOPs - self.min_FLOPs), 4)
         self.opt_pareto_front_norm = np.round(self.opt_pareto_front_norm, 6)
 
-        f_opt_pareto_front_val = open(f'{self.pareto_opt_front_path}/[POF_ValAcc_FLOPs]_[NAS201_{self.dataset}].p', 'rb')
+        f_opt_pareto_front_val = open(f'{self.pof_path}/[POF_ValAcc_FLOPs]_[NAS201_{self.dataset}].p', 'rb')
         self.opt_pareto_front_val = p.load(f_opt_pareto_front_val)
         self.opt_pareto_front_val[:, 0] /= 100
         f_opt_pareto_front_val.close()

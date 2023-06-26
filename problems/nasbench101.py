@@ -48,8 +48,8 @@ class NASBench101(Problem):
 
         self.maxLength = 28
 
-        self.data_path = kwargs['path_api_benchmark'] + '/NASBench101'
-        self.pareto_opt_front_path = kwargs['path_pareto_optimal_front']
+        self.path_data = kwargs['api_benchmark_path'] + '/NASBench101'
+        self.pof_path = kwargs['pof_path']
 
         self.min_params, self.max_params = None, None
 
@@ -62,11 +62,11 @@ class NASBench101(Problem):
         self.efficiency_cache = {}
 
     def _set_up(self):
-        self.api = api.NASBench_(self.data_path + '/data.p')
+        self.api = api.NASBench_(self.path_data + '/data.p')
 
         self.min_params, self.max_params = 227274, 49979274
 
-        f_opt_pareto_front = open(f'{self.pareto_opt_front_path}/[POF_TestAcc_Params]_[NAS101].p', 'rb')
+        f_opt_pareto_front = open(f'{self.pof_path}/[POF_TestAcc_Params]_[NAS101].p', 'rb')
         self.opt_pareto_front = p.load(f_opt_pareto_front)
         f_opt_pareto_front.close()
 
@@ -74,7 +74,7 @@ class NASBench101(Problem):
         self.opt_pareto_front_norm[:, 1] = np.round((self.opt_pareto_front_norm[:, 1] - self.min_params) / (self.max_params - self.min_params), 4)
         self.opt_pareto_front_norm = np.round(self.opt_pareto_front_norm, 6)
 
-        f_opt_pareto_front_val = open(f'{self.pareto_opt_front_path}/[POF_ValAcc_Params]_[NAS101].p', 'rb')
+        f_opt_pareto_front_val = open(f'{self.pof_path}/[POF_ValAcc_Params]_[NAS101].p', 'rb')
         self.opt_pareto_front_val = p.load(f_opt_pareto_front_val)
         f_opt_pareto_front_val.close()
 

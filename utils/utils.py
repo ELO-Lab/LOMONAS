@@ -119,8 +119,8 @@ def run_evaluation_phase(genotype_list, problem):
     for genotype in genotype_list:
         test_performance = problem.get_test_performance(arch=genotype)
         efficiency_metric = problem.get_efficiency_metric(arch=genotype)
-        F = test_performance + efficiency_metric
-        fitness_list.append(F)
+        f = test_performance + efficiency_metric
+        fitness_list.append(f)
 
         if test_performance[-1] < best_performance:  # Minimization
             best_arch = convert_arch_genotype_int_to_api_input(genotype, problem.name)
@@ -133,6 +133,7 @@ def run_evaluation_phase(genotype_list, problem):
     AF = np.unique(fitness_list[idx_front_0], axis=0)
 
     IGD = problem.calculate_IGD(AF)
+    IGDp = problem.calculate_IGDp(AF)
     HV = problem.calculate_HV(AF)
 
     if problem.name in ['NASBench101']:
@@ -145,6 +146,7 @@ def run_evaluation_phase(genotype_list, problem):
         'Approximation Set': AS_new,
         'Approximation Front': AF,
         'IGD': IGD,
+        'IGD+': IGDp,
         'HV': HV,
         'Best Architecture': best_arch,
         'Best Architecture (performance)': best_performance

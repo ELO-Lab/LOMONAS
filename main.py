@@ -6,9 +6,16 @@ import pickle as p
 import numpy as np
 from sys import platform
 import logging
+import json
 
 from factory import get_problems, get_optimizer, get_objectives
 from utils import run_evaluation_phase, visualize_archive
+
+class NumpyEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+        return json.JSONEncoder.default(self, obj)
 
 np.seterr(invalid='ignore')
 def run(kwargs):
@@ -73,24 +80,24 @@ def run(kwargs):
     executed_time_list = []
 
     ''' =============================================== Log Information ============================================ '''
-
-    if 'MOEA' in kwargs.optimizer:
-        logging.info(f'- Population size: {pop_size}')
-        logging.info(f'- Crossover method: {optimizer.crossover.method}')
-        logging.info(f'- Mutation method: Bit-string')
-        if 'NSGAII' in optimizer.name:
-            logging.info(f'- Selection method: {optimizer.survival.name}\n')
-
-    if 'LOMONAS' in optimizer.name:
-        logging.info(f'- NF: {optimizer.NF}')
-        logging.info(f'- Evaluate all neighbors?: {optimizer.get_all_neighbors}')
-        logging.info(f'- Local search on all solutions?: {optimizer.local_search_on_all_sols}\n')
-    else:
-        logging.info(f'- Loop: {optimizer.loop}\n')
+    #
+    # if 'MOEA' in kwargs.optimizer:
+    #     logging.info(f'- Population size: {pop_size}')
+    #     logging.info(f'- Crossover method: {optimizer.crossover.method}')
+    #     logging.info(f'- Mutation method: Bit-string')
+    #     if 'NSGAII' in optimizer.name:
+    #         logging.info(f'- Selection method: {optimizer.survival.name}\n')
+    #
+    # if 'LOMONAS' in optimizer.name:
+    #     logging.info(f'- NF: {optimizer.NF}')
+    #     logging.info(f'- Evaluate all neighbors?: {optimizer.get_all_neighbors}')
+    #     logging.info(f'- Local search on all solutions?: {optimizer.local_search_on_all_sols}\n')
+    # else:
+    #     logging.info(f'- Loop: {optimizer.loop}\n')
 
     ''' ==================================================================================================== '''
-    list_IGD_s, list_HV_s = [], []
-    list_IGD, list_HV = [], []
+    list_IGD_s, list_IGDp_s, list_HV_s = [], [], []
+    list_IGD, list_IGDp, list_HV = [], [], []
     list_best_acc = []
     list_search_cost = []
 
@@ -143,6 +150,9 @@ def run(kwargs):
         else:
             configuration['Optimizer']['Loop?'] = f'{optimizer.loop}'
 
+        with open(f'{ALGO_RES_PATH}/configuration.json', 'w') as fp:
+            json.dump(configuration, fp, indent=4, cls=NumpyEncoder)
+
         # SEARCH PHASE
         print("-" * 104)
         content = ['#Evals', 'IGD (search)', 'HV (search)', 'IGD (evaluation)', 'HV (evaluation)']
@@ -158,8 +168,9 @@ def run(kwargs):
         AF_s = search_results['Approximation Front']
         visualize_archive(AF_s, xlabel=problem.objective_1, ylabel='Validation Performance', title=problem.name,
                           label=f'{optimizer.name}', path=RID_RES_PATH, fig_name='approximation_front_search')
-        IGD_s, HV_s = optimizer.problem.calculate_IGD_val(AF_s), optimizer.problem.calculate_HV(AF_s)
+        IGD_s, IGDp_s, HV_s = optimizer.problem.calculate_IGD_val(AF_s), optimizer.problem.calculate_IGDp_val(AF_s), optimizer.problem.calculate_HV(AF_s)
         list_IGD_s.append(IGD_s)
+        list_IGDp_s.append(IGDp_s)
         list_HV_s.append(HV_s)
 
         # EVALUATION PHASE
@@ -171,7 +182,7 @@ def run(kwargs):
         visualize_archive(AF, xlabel=problem.objective_1, ylabel=problem.objective_0, title=problem.name,
                           label=f'{optimizer.name}', path=RID_RES_PATH, fig_name='approximation_front')
         print("-" * 104)
-        content = ['Final', IGD_s, HV_s, evaluation_results["IGD"], evaluation_results["HV"]]
+        content = ['Final', IGD_s, HV_s, evaluation_results["IGD"], evaluation_results["IGD+"], evaluation_results["HV"]]
         print(
             "\033[92m{:<10}\033[00m | \033[96m{:^20.6f}\033[00m | \033[96m{:^20.6f}\033[00m | \033[93m{:^20.6f}\033[00m | \033[93m{:^20.6f}\033[00m |".format(
                 *content))
@@ -184,9 +195,23 @@ def run(kwargs):
         print('\033[95m' + 'Search Cost' + '\033[00m' + f': {round(search_results["Search Cost"])} seconds')
 
         list_IGD.append(evaluation_results['IGD'])
+        list_IGDp.append(evaluation_results['IGD+'])
         list_HV.append(evaluation_results['HV'])
         list_best_acc.append(evaluation_results['Best Architecture (performance)'])
         list_search_cost.append(search_results['Search Cost'])
+        
+        res = {
+            'Run': rid,
+            'IGD (search)': IGD_s,
+            'IGD+ (search)': IGDp_s,
+            'HV (search)': HV_s,
+            'IGD': evaluation_results['IGD'],
+            'IGD+': evaluation_results['IGD+'],
+            'HV': evaluation_results['HV'],
+        }
+        with open(f'{ALGO_RES_PATH}/exp_result.json', 'w') as fp:
+            json.dump(res, fp, indent=4, cls=NumpyEncoder)
+
     print("-" * 104)
     content = ['-', 'IGD (search)', 'HV (search)', 'IGD (evaluation)', 'HV (evaluation)']
     print(

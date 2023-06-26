@@ -36,8 +36,8 @@ class MacroNAS(Problem):
         self.available_ops = [0, 1, 2]
         self.maxLength = 14
 
-        self.data_path = kwargs['path_api_benchmark'] + f'/MacroNAS'
-        self.pareto_opt_front_path = kwargs['path_pareto_optimal_front']
+        self.path_data = kwargs['api_benchmark_path'] + f'/MacroNAS'
+        self.pof_path = kwargs['pof_path']
 
         self.min_MMACs, self.max_MMACs = None, None
 
@@ -55,14 +55,14 @@ class MacroNAS(Problem):
             raise ValueError(f'Just only supported these subsets: CIFAR-10; CIFAR-100.'
                              f'{self.dataset} subset is not supported at this time.')
 
-        self.api = API(data_path=self.data_path, dataset=self.dataset)
+        self.api = API(path_data=self.path_data, dataset=self.dataset)
 
         if self.dataset == 'CIFAR-10':
             self.min_MMACs, self.max_MMACs = 21.31, 239.28
         else:
             self.min_MMACs, self.max_MMACs = 21.54, 239.51
 
-        f_opt_pareto_front = open(f'{self.pareto_opt_front_path}/[POF_TestAcc_MMACs]_[MacroNAS_{self.dataset}].p', 'rb')
+        f_opt_pareto_front = open(f'{self.pof_path}/[POF_TestAcc_MMACs]_[MacroNAS_{self.dataset}].p', 'rb')
         self.opt_pareto_front = p.load(f_opt_pareto_front)
         self.opt_pareto_front[:, 0] /= 100
         f_opt_pareto_front.close()
@@ -72,7 +72,7 @@ class MacroNAS(Problem):
             (self.opt_pareto_front_norm[:, 1] - self.min_MMACs) / (self.max_MMACs - self.min_MMACs), 4)
         self.opt_pareto_front_norm = np.round(self.opt_pareto_front_norm, 6)
 
-        f_opt_pareto_front_val = open(f'{self.pareto_opt_front_path}/[POF_ValAcc_MMACs]_[MacroNAS_{self.dataset}].p', 'rb')
+        f_opt_pareto_front_val = open(f'{self.pof_path}/[POF_ValAcc_MMACs]_[MacroNAS_{self.dataset}].p', 'rb')
         self.opt_pareto_front_val = p.load(f_opt_pareto_front_val)
         self.opt_pareto_front_val[:, 0] /= 100
         f_opt_pareto_front_val.close()

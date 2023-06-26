@@ -9,9 +9,9 @@ def arch_2_key(arch):
     return key
 
 class API:
-    def __init__(self, data_path, dataset):
+    def __init__(self, path_data, dataset):
         self.dataset = dataset
-        self.api = json.load(open(data_path + f'/[{dataset}]_data.json'))
+        self.api = json.load(open(path_data + f'/[{dataset}]_data.json'))
 
     def get_test_accuracy(self, arch):
         keyData = arch_2_key(arch)
