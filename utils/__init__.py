@@ -1,4 +1,3 @@
-from .IGD import calculate_IGD_value
 from .elitist_archive import ElitistArchive
 from .compare import find_the_better
 

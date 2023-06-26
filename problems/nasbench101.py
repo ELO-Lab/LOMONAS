@@ -172,7 +172,6 @@ class NASBench101(Problem):
         approximation_front = np.round(approximation_front, 4)
         if self.opt_pareto_front is None:
             return -1
-        # IGD_value = calculate_IGD_value(pareto_optimal_front=self.opt_pareto_front_norm, approximation_front=approximation_front)
         IGD_value = self.IGD_calc(approximation_front)
         return IGD_value
 
@@ -191,7 +190,6 @@ class NASBench101(Problem):
         approximation_front = np.round(approximation_front, 4)
         if self.opt_pareto_front_val is None:
             return -1
-        # IGD_value = calculate_IGD_value(pareto_optimal_front=self.opt_pareto_front_val_norm, approximation_front=approximation_front)
         IGD_value = self.IGD_s_calc(approximation_front)
         return IGD_value
 

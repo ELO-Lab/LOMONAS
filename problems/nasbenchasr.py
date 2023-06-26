@@ -2,7 +2,7 @@ import numpy as np
 import pickle as p
 from api_benchmarks.api_ASR.api import API
 from problems.NAS_problem import Problem
-from utils import calculate_IGD_value, get_hashKey
+from utils import get_hashKey
 from pymoo.indicators.hv import HV
 from pymoo.indicators.igd import IGD
 from pymoo.indicators.igd_plus import IGDPlus

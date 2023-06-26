@@ -39,6 +39,9 @@ class MOEAD_Net(NSGA_Net):
     def _reset(self):
         self.decomposition = None
         self.ideal = None
+        self.IGD_search_history = []
+        self.IGDp_search_history = []
+        self.HV_search_history = []
 
     def _setup(self):
         self.sampling.nSamples = self.pop_size
@@ -52,7 +55,7 @@ class MOEAD_Net(NSGA_Net):
         self.initialize()
 
         self.do_each_gen()
-        while self.n_eval < self.problem.maxEvals:
+        while self.n_eval < self.problem.max_eval:
             self.n_gen += 1
             self.next(self.pop)
             self.do_each_gen()

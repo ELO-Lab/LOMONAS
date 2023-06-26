@@ -84,7 +84,7 @@ class NSGA_Net(Algorithm):
         self.pop = self.survival.do(self.pop, self.pop_size)
 
         self.do_each_gen()
-        while self.n_eval < self.problem.maxEvals:
+        while self.n_eval < self.problem.max_eval:
             self.n_gen += 1
             self.next(self.pop)
             self.do_each_gen()
@@ -139,7 +139,7 @@ class NSGA_Net(Algorithm):
                 self.IGD_search_history[-1], self.IGDp_search_history[-1], self.HV_search_history[-1],
                 self.IGD_search_history[-1], self.IGDp_evaluate_history[-1], self.HV_evaluate_history[-1]
             ]
-            print("-" * 104)
+            print("-" * 150)
             print(
                 "\033[92m{:<10}\033[00m | \033[96m{:^20.6f}\033[00m | \033[96m{:^20.6f}\033[00m | \033[96m{:^20.6f}\033[00m | \033[93m{:^20.6f}\033[00m | \033[93m{:^20.6f}\033[00m | \033[93m{:^20.6f}\033[00m |".format(
                     *content))

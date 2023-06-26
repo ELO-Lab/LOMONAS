@@ -75,7 +75,7 @@ class RR_LS(LOMONAS):
         self.start_executed_time_algorithm = time.time()
 
         ls_archive = []
-        while self.n_eval < self.problem.maxEvals:
+        while self.n_eval < self.problem.max_eval:
             # 1. Initialize a random architecture
             x = sample(self.problem)
             f = self.evaluate(x)
@@ -126,7 +126,7 @@ class RR_LS(LOMONAS):
                         self.IGD_search_history[-1], self.IGDp_search_history[-1], self.HV_search_history[-1],
                         self.IGD_search_history[-1], self.IGDp_evaluate_history[-1], self.HV_evaluate_history[-1]
                     ]
-                    print("-" * 104)
+                    print("-" * 150)
                     print(
                         "\033[92m{:<10}\033[00m | \033[96m{:^20.6f}\033[00m | \033[96m{:^20.6f}\033[00m | \033[96m{:^20.6f}\033[00m | \033[93m{:^20.6f}\033[00m | \033[93m{:^20.6f}\033[00m | \033[93m{:^20.6f}\033[00m |".format(
                             *content))

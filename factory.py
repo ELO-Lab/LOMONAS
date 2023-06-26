@@ -59,14 +59,16 @@ def get_problems(problem_name, max_eval=3000, **kwargs):
 
 def get_optimizer(optimizer_name, **kwargs):
     if 'MOEA' in optimizer_name:
+        pop_size = kwargs['pop_size']
         sampling = RandomSampling()
         crossover = PointCrossover('2X')
         mutation = BitStringMutation()
         if 'NSGAII' in optimizer_name:
             from algorithms.MOEAs import NSGA_Net
             survival = RankAndCrowdingSurvival()
-            return NSGA_Net(
-                name=optimizer_name,
+            optimizer = NSGA_Net(name=optimizer_name)
+            optimizer.set_hyperparameters(
+                pop_size=pop_size,
                 sampling=sampling,
                 crossover=crossover,
                 mutation=mutation,
@@ -75,31 +77,33 @@ def get_optimizer(optimizer_name, **kwargs):
             )
         elif 'MOEAD' in optimizer_name:
             from algorithms.MOEAs import MOEAD_Net
-            return MOEAD_Net(
-                name=optimizer_name,
+            optimizer = MOEAD_Net(name=optimizer_name)
+            optimizer.set_hyperparameters(
+                pop_size=pop_size,
                 sampling=sampling,
                 crossover=crossover,
                 mutation=mutation,
-                debug=bool(kwargs['debug']),
+                debug=bool(kwargs['debug'])
             )
     elif optimizer_name == 'LOMONAS':
         from algorithms.MOLS import LOMONAS
-        return LOMONAS(
-            name=optimizer_name,
+        optimizer = LOMONAS(name=optimizer_name)
+        optimizer.set_hyperparameters(
             NF=kwargs['NF'],
-            get_all_neighbors=bool(kwargs['get_all_neighbors']),
-            local_search_on_all_sols=bool(kwargs['local_search_on_all_sols']),
+            check_all_neighbors=bool(kwargs['check_all_neighbors']),
+            neighborhood_check_on_all_sols=bool(kwargs['neighborhood_check_on_all_sols']),
             debug=bool(kwargs['debug']),
         )
     elif optimizer_name == 'RR_LS':
         from algorithms.MOLS import RR_LS
-        return RR_LS(
-            name=optimizer_name,
+        optimizer = RR_LS(name=optimizer_name)
+        optimizer.set_hyperparameters(
             loop=bool(kwargs['loop']),
             debug=bool(kwargs['debug'])
         )
     else:
         raise ValueError(f'Not supporting this algorithm - {optimizer_name}.')
+    return optimizer
 
 def get_objectives(problem_name, optimizer_name):
     return objectives4algorithm[problem_name][optimizer_name]
