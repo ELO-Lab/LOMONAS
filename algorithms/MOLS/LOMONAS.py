@@ -8,180 +8,6 @@ import time
 from copy import deepcopy
 from pymoo.util.nds.non_dominated_sorting import NonDominatedSorting
 from utils import visualize_IGD_value_and_nEvals, visualize_HV_value_and_nEvals
-from utils import visualize_Elitist_Archive_and_Pareto_Front
-
-def sample(arch_history, problem):
-    while True:
-        X = problem.sample_a_compact_architecture()
-        if problem.isValid(X):
-            hashKey = get_hashKey(X, problem.name + '*')
-            if hashKey not in arch_history:
-                return X
-
-
-def get_partial_neighbors(X_arch, arch_history, problem):
-    problem_name = problem.name
-    hashKey_arch = get_hashKey(X_arch, problem_name + '*')
-
-    if hashKey_arch in arch_history:
-        if len(arch_history[hashKey_arch]) == 0:
-            return [], arch_history
-        available_idx = arch_history[hashKey_arch]
-        idx_replace = np.random.choice(available_idx)
-        arch_history[hashKey_arch].remove(idx_replace)
-    else:
-        if problem_name == 'NASBench101':
-            available_idx = list(range(len(X_arch)))
-            available_idx.remove(0)
-            available_idx.remove(21)
-        elif problem_name in ['NASBench201', 'MacroNAS', 'NASBenchASR']:
-            available_idx = list(range(len(X_arch)))
-        else:
-            raise ValueError()
-        arch_history[hashKey_arch] = available_idx
-        idx_replace = np.random.choice(arch_history[hashKey_arch])
-        arch_history[hashKey_arch].remove(idx_replace)
-
-    if problem_name == 'NASBench101':
-        if idx_replace in problem.IDX_OPS:
-            available_ops = problem.OPS.copy()
-        else:
-            available_ops = problem.EDGES.copy()
-    elif problem_name == 'NASBenchASR':
-        if idx_replace in problem.IDX_MAIN_OPS:
-            available_ops = problem.MAIN_OPS.copy()
-        else:
-            available_ops = problem.SKIP_OPS.copy()
-    elif problem_name in ['NASBench201', 'MacroNAS']:
-        available_ops = problem.available_ops.copy()
-    else:
-        raise ValueError()
-    available_ops_at_idx_replace = available_ops.copy()
-    available_ops_at_idx_replace.remove(X_arch[idx_replace])
-
-    list_X_neighbors = []
-    for op in available_ops_at_idx_replace:
-        X_neighbor = X_arch.copy()
-        X_neighbor[idx_replace] = op
-        list_X_neighbors.append(X_neighbor)
-    return list_X_neighbors, arch_history
-
-
-def get_all_neighbors(X_arch, arch_history, problem):
-    problem_name = problem.name
-    hashKey_arch = get_hashKey(X_arch, problem_name + '*')
-
-    if hashKey_arch in arch_history:
-        return [], arch_history
-    list_X_neighbors = []
-
-    if problem_name == 'NASBench101':
-        available_idx = list(range(len(X_arch)))
-        available_idx.remove(0)
-        available_idx.remove(21)
-    elif problem_name in ['NASBench201', 'MacroNAS', 'NASBenchASR']:
-        available_idx = list(range(len(X_arch)))
-    else:
-        raise ValueError()
-
-    for idx_replace in available_idx:
-        if problem_name == 'NASBench101':
-            if idx_replace in problem.IDX_OPS:
-                available_ops = problem.OPS.copy()
-            else:
-                available_ops = problem.EDGES.copy()
-        elif problem_name == 'NASBenchASR':
-            if idx_replace in problem.IDX_MAIN_OPS:
-                available_ops = problem.MAIN_OPS.copy()
-            else:
-                available_ops = problem.SKIP_OPS.copy()
-        elif problem_name in ['NASBench201', 'MacroNAS']:
-            available_ops = problem.available_ops.copy()
-        else:
-            raise ValueError()
-        available_ops_at_idx_replace = available_ops.copy()
-        available_ops_at_idx_replace.remove(X_arch[idx_replace])
-        for op in available_ops_at_idx_replace:
-            X_neighbor = X_arch.copy()
-            X_neighbor[idx_replace] = op
-            list_X_neighbors.append(X_neighbor)
-    arch_history[hashKey_arch] = list_X_neighbors
-    return list_X_neighbors, arch_history
-
-
-####################################### Get architectures for local search #############################################
-
-## Get all architectures
-def get_all_archs_for_local_search(X_set, F_set, NF):
-    idx_fronts = NonDominatedSorting().do(np.array(F_set))
-    selected_idx = np.zeros(len(F_set), dtype=bool)
-    N = min(len(idx_fronts), NF)
-    for i in range(N):
-        for j in idx_fronts[i]:
-            selected_idx[j] = True
-    X_local_search_list = np.array(X_set)[selected_idx].tolist()
-    return X_local_search_list
-
-
-## Get potential architectures (knee and extreme ones)
-def get_potential_archs_for_local_search(X_set, F_set, NF):
-    X_list = []
-
-    idx_fronts = NonDominatedSorting().do(np.array(F_set))
-    N = min(len(idx_fronts), NF)
-    for i in range(N):
-        selected_idx = np.zeros(len(F_set), dtype=bool)
-        selected_idx[idx_fronts[i]] = True
-
-        X_front_i = np.array(X_set)[selected_idx]
-        F_front_i = np.array(F_set)[selected_idx]
-
-        potential_sols = seeking(X_front_i, F_front_i)
-        potential_sols_list = np.array([info[1] for info in potential_sols])
-
-        for X in potential_sols_list:
-            X_list.append(X)
-    return X_list
-
-
-########################################## Multi-objective Local Search ################################################
-## Get all neighbors (for creating the neighbors dictionary)
-def _get_all_neighbors(problem, arch):
-    problem_name = problem.name
-
-    list_neighbors = []
-
-    if problem_name == 'NASBench101':
-        available_idx = list(range(len(arch)))
-        available_idx.remove(0)
-        available_idx.remove(21)
-    elif problem_name in ['NASBench201', 'MacroNAS', 'NASBenchASR']:
-        available_idx = list(range(len(arch)))
-    else:
-        raise ValueError()
-
-    for idx_replace in available_idx:
-        if problem_name == 'NASBench101':
-            if idx_replace in problem.IDX_OPS:
-                available_ops = problem.OPS.copy()
-            else:
-                available_ops = problem.EDGES.copy()
-        elif problem_name == 'NASBenchASR':
-            if idx_replace in problem.IDX_MAIN_OPS:
-                available_ops = problem.MAIN_OPS.copy()
-            else:
-                available_ops = problem.SKIP_OPS.copy()
-        elif problem_name in ['NASBench201', 'MacroNAS']:
-            available_ops = problem.available_ops.copy()
-        else:
-            raise ValueError()
-        available_ops_at_idx_replace = available_ops.copy()
-        available_ops_at_idx_replace.remove(arch[idx_replace])
-        for op in available_ops_at_idx_replace:
-            neighbor_X = arch.copy()
-            neighbor_X[idx_replace] = op
-            list_neighbors.append(neighbor_X)
-    return list_neighbors
 
 class LOMONAS(Algorithm):
     """
@@ -194,14 +20,16 @@ class LOMONAS(Algorithm):
         # Default: f0 -> performance metric; f1 -> efficiency metric
         self.f0, self.f1 = None, None
         self.NF = 3
-        self.get_all_neighbors = False
-        self.local_search_on_all_sols = True
+        self.check_all_neighbors = False
+        self.neighborhood_check_on_all_sols = True
 
         self.IGD_search_history = []
+        self.IGDp_search_history = []
         self.HV_search_history = []
 
     def _reset(self):
         self.IGD_search_history = []
+        self.IGDp_search_history = []
         self.HV_search_history = []
 
     def _setup(self):
@@ -219,7 +47,7 @@ class LOMONAS(Algorithm):
         efficiency_metric = self.problem.get_efficiency_metric(arch=arch)
 
         self.executed_time_algorithm_history.append(executed_time_algorithm)
-        self.nEvals += 1
+        self.n_eval += 1
         self.benchmark_time_algorithm_history.append(self.benchmark_time_algorithm_history[-1] + benchmark_time)
         self.indicator_time_history.append(self.indicator_time_history[-1] + indicator_time)
         self.evaluated_time_history.append(self.evaluated_time_history[-1] + benchmark_time + indicator_time)
@@ -227,115 +55,76 @@ class LOMONAS(Algorithm):
         self.start_executed_time_algorithm = time.time()
         return performance_metric + efficiency_metric
 
-    def get_list_neighbors(self, Q, arch_history, hashKey_SF, get_all_neighbors_flag=None):
-        if get_all_neighbors_flag is None:
-            get_all_neighbors_flag = self.get_all_neighbors
-
-        _arch_history = arch_history
-        list_X_neighbors = []
-        list_hashKey_neighbors = []
-
-        for i, arch in enumerate(Q):
-            if get_all_neighbors_flag:
-                tmp_list_X_neighbors, _arch_history = get_all_neighbors(arch, _arch_history, self.problem)
-            else:
-                tmp_list_X_neighbors, _arch_history = get_partial_neighbors(arch, _arch_history, self.problem)
-
-            for X_neighbor in tmp_list_X_neighbors:
-                if self.problem.isValid(X_neighbor):
-                    hashKey_neighbor = get_hashKey(X_neighbor, problem_name=self.problem.name)
-                    if check_valid(hashKey_neighbor,
-                                   list_hashKey_Q=hashKey_SF,
-                                   list_hashKey_neighbors=list_hashKey_neighbors):
-                        list_X_neighbors.append(X_neighbor)
-                        list_hashKey_neighbors.append(hashKey_neighbor)
-        return list_X_neighbors, list_hashKey_neighbors, _arch_history
-
     def _solve(self):
         self.start_executed_time_algorithm = time.time()
         is_continue = True
 
-        arch_history = {}
+        H = {}
 
         # lines 3 - 4
-        X_start = sample(arch_history, self.problem)
-        hashKey_start = get_hashKey(X_start, self.problem.name)
-        F_start = self.evaluate(X_start)
+        x_start = sample(H, self.problem)
+        hashKey_start = get_hashKey(x_start, self.problem.name)
+        f_start = self.evaluate(x_start)
 
         while is_continue:
-            start_arch = Individual()
-            start_arch.set('X', X_start)
-            start_arch.set('hashKey', hashKey_start)
-            start_arch.set('F', F_start)
+            start_arch = Individual(x=x_start, hashKey=hashKey_start, f=f_start)
             self.E_Archive_search.update(start_arch, algorithm=self, problem_name=self.problem.name)
 
-            # line 6
-            X_SF = [start_arch.X]
-            hashKey_SF = [start_arch.hashKey]
-            F_SF = [start_arch.F]
+            X_S, hashKey_S, F_S = [start_arch.X], [start_arch.hashKey], [start_arch.F]  # line 6
 
             Q = [start_arch.X]  # line 7
 
             while True:
-                list_X_neighbors, list_hashKey_neighbors, arch_history = self.get_list_neighbors(Q,
-                                                                                                 arch_history,
-                                                                                                 hashKey_SF)  # line 9
-                list_F_neighbors = []
+                X_N, hashKey_N, H = self.getNeighbors(Q, H, hashKey_S)  # line 9
+                F_N = []
 
-                if len(list_X_neighbors) == 0:  # line 10
+                if len(X_N) == 0:  # line 10
                     # lines 11 - 15
-                    for f in range(2, self.NF + 1):
-                        if self.local_search_on_all_sols:
-                            Q = get_all_archs_for_local_search(X_SF, F_SF, f)
+                    for fid in range(2, self.NF + 1):
+                        if self.neighborhood_check_on_all_sols:
+                            Q = getAll4NeighborhoodCheck(X_S, F_S, fid)
                         else:
-                            Q = get_potential_archs_for_local_search(X_SF, F_SF, f)
+                            Q = getPotential4NeighborhoodCheck(X_S, F_S, fid)
 
-                        list_X_neighbors, list_hashKey_neighbors, arch_history = self.get_list_neighbors(Q,
-                                                                                                         arch_history,
-                                                                                                         hashKey_SF)
-                        if len(list_X_neighbors) != 0:
+                        X_N, hashKey_N, H = self.getNeighbors(Q, H, hashKey_S)
+                        if len(X_N) != 0:
                             break
 
                     # lines 16 - 21
-                    if len(list_X_neighbors) == 0:
+                    if len(X_N) == 0:
                         X_archive = self.E_Archive_search.X
                         while True:
-                            idx = np.random.choice(len(X_archive))
-                            selected_arch = X_archive[idx]
-                            list_neighbors = []
-                            tmp_list_neighbors = _get_all_neighbors(self.problem, selected_arch)
+                            selected_arch = X_archive[np.random.choice(len(X_archive))]
+                            X_N = []
+                            tmp_N = _getAllNeighbors(self.problem, selected_arch)
 
-                            for X_neighbor in tmp_list_neighbors:
-                                if self.problem.isValid(X_neighbor):
-                                    hashKey_neighbor = get_hashKey(X_neighbor, self.problem.name + '*')
-                                    if hashKey_neighbor not in arch_history:
-                                        list_neighbors.append(X_neighbor)
-                            if len(list_neighbors) != 0:
+                            for x in tmp_N:
+                                if self.problem.isValid(x):
+                                    hashKey = get_hashKey(x, self.problem.name + '*')
+                                    if hashKey not in H:
+                                        X_N.append(x)
+                            if len(X_N) != 0:
                                 break
 
-                        idx_selected_neighbor = np.random.choice(len(list_neighbors))
-                        X_start = list_neighbors[idx_selected_neighbor]
-                        hashKey_start = get_hashKey(X_start, self.problem.name)
-                        F_start = self.evaluate(X_start)
+                        x_start = X_N[np.random.choice(len(X_N))]
+                        hashKey_start = get_hashKey(x_start, self.problem.name)
+                        f_start = self.evaluate(x_start)
                         break
 
                 # lines 23
-                for X_neighbor in list_X_neighbors:
-                    hashKey_neighbor = get_hashKey(X_neighbor, problem_name=self.problem.name)
+                for x in X_N:
+                    hashKey = get_hashKey(x, problem_name=self.problem.name)
 
-                    F_neighbor = self.evaluate(X_neighbor)
-                    list_F_neighbors.append(F_neighbor)
+                    f = self.evaluate(x)
+                    F_N.append(f)
 
-                    neighbor_arch = Individual()
-                    neighbor_arch.set('X', X_neighbor)
-                    neighbor_arch.set('hashKey', hashKey_neighbor)
-                    neighbor_arch.set('F', F_neighbor)
+                    neighbor_arch = Individual(x=x, hashKey=hashKey, f=f)
                     self.E_Archive_search.update(neighbor_arch, algorithm=self, problem_name=self.problem.name)
 
                 # line 24
-                X_P = X_SF + list_X_neighbors
-                hashKey_P = hashKey_SF + list_hashKey_neighbors
-                F_P = F_SF + list_F_neighbors
+                X_P = X_S + X_N
+                hashKey_P = hashKey_S + hashKey_N
+                F_P = F_S + F_N
 
                 idx_fronts = NonDominatedSorting().do(np.array(F_P))
                 idx_selected = np.zeros(len(F_P), dtype=bool)
@@ -344,27 +133,27 @@ class LOMONAS(Algorithm):
                     for j in idx_fronts[i]:
                         idx_selected[j] = True
 
-                X_SF = np.array(deepcopy(X_P))[idx_selected].tolist()
-                hashKey_SF = np.array(deepcopy(hashKey_P))[idx_selected].tolist()
-                F_SF = np.array(deepcopy(F_P))[idx_selected].tolist()
+                X_S = np.array(deepcopy(X_P))[idx_selected].tolist()
+                hashKey_S = np.array(deepcopy(hashKey_P))[idx_selected].tolist()
+                F_S = np.array(deepcopy(F_P))[idx_selected].tolist()
 
                 # line 25
-                if self.local_search_on_all_sols:
-                    Q = X_SF
+                if self.neighborhood_check_on_all_sols:
+                    Q = X_S
                 else:
-                    Q = get_potential_archs_for_local_search(X_SF, F_SF, 1)
+                    Q = getPotential4NeighborhoodCheck(X_S, F_S, 1)
 
-                if self.nEvals >= self.problem.maxEvals:
+                if self.n_eval >= self.problem.max_eval:
                     is_continue = False
                     break
                 if self.debug:
-                    print(f'-------------------------------------------------------------')
-                    print(f'-> IGD (search): {self.IGD_search_history[-1]}')
-                    print(f'-> IGD (evaluation): {self.IGD_evaluate_history[-1]}')
-                    print(f'-> HV (search): {self.HV_search_history[-1]}')
-                    print(f'-> HV (evaluation): {self.HV_evaluate_history[-1]}')
-                    print(f'-> nEvals / maxEvals: {self.nEvals}/{self.problem.maxEvals}')
-                    print()
+                    content = [
+                        self.n_eval,
+                        self.IGD_search_history[-1], self.IGDp_search_history[-1], self.HV_search_history[-1],
+                        self.IGD_search_history[-1], self.IGDp_evaluate_history[-1], self.HV_evaluate_history[-1]
+                    ]
+                    print("-" * 104)
+                    print("\033[92m{:<10}\033[00m | \033[96m{:^20.6f}\033[00m | \033[96m{:^20.6f}\033[00m | \033[96m{:^20.6f}\033[00m | \033[93m{:^20.6f}\033[00m | \033[93m{:^20.6f}\033[00m | \033[93m{:^20.6f}\033[00m |".format(*content))
 
         self.finalize()
         results = {
@@ -374,10 +163,34 @@ class LOMONAS(Algorithm):
         }
         return results
 
+    ########################################################################################################## Utilities
+    def getNeighbors(self, Q, H, hashKey_S, get_all_neighbors_flag=None):
+        if get_all_neighbors_flag is None:
+            get_all_neighbors_flag = self.check_all_neighbors
+
+        clone_H = H
+        X_N, hashKey_N = [], []
+
+        for i, arch in enumerate(Q):
+            if get_all_neighbors_flag:
+                tmp_X_N, clone_H = getAllNeighbors(arch, clone_H, self.problem)
+            else:
+                tmp_X_N, clone_H = getPartialNeighbors(arch, clone_H, self.problem)
+
+            for x in tmp_X_N:
+                if self.problem.isValid(x):
+                    hashKey = get_hashKey(x, problem_name=self.problem.name)
+                    if check_valid(hashKey,
+                                   list_hashKey_S=hashKey_S,
+                                   list_hashKey_neighbors=hashKey_N):
+                        X_N.append(x)
+                        hashKey_N.append(hashKey)
+        return X_N, hashKey_N, clone_H
+
     def log_elitist_archive(self, **kwargs):
         E_Archive_evaluate = ElitistArchive(log_each_change=False)
 
-        self.nEvals_history.append(self.nEvals)
+        self.nEvals_history.append(self.n_eval)
 
         EA_search = {
             'X': self.E_Archive_search.X.copy(),
@@ -390,13 +203,12 @@ class LOMONAS(Algorithm):
         # Evaluation Step (to visualize the trend of IGD, do not affect the process of NAS search)
         dummy_idv = Individual()
         ## Evaluate each architecture in the Elitist Archive
-        for arch in EA_search['X']:
-            X = arch
-            test_error = self.problem.get_test_performance(arch=X)
-            efficiency_metric = self.problem.get_efficiency_metric(arch=X)
-            F = test_error + efficiency_metric
-            dummy_idv.set('X', X)
-            dummy_idv.set('F', F)
+        for x in EA_search['X']:
+            test_error = self.problem.get_test_performance(arch=x)
+            efficiency_metric = self.problem.get_efficiency_metric(arch=x)
+            f = test_error + efficiency_metric
+            dummy_idv.set('X', x)
+            dummy_idv.set('F', f)
             E_Archive_evaluate.update(dummy_idv, problem_name=self.problem.name)
 
         ## Calculate the IGD indicator.
@@ -405,16 +217,20 @@ class LOMONAS(Algorithm):
         approximation_front = np.unique(approximation_front, axis=0)
 
         IGD_value_evaluate = self.problem.calculate_IGD(approximation_front=approximation_front)
+        IGDp_value_evaluate = self.problem.calculate_IGDp(approximation_front=approximation_front)
         HV_value_evaluate = self.problem.calculate_HV(approximation_front=approximation_front)
         self.IGD_evaluate_history.append(IGD_value_evaluate)
+        self.IGDp_evaluate_history.append(IGDp_value_evaluate)
         self.HV_evaluate_history.append(HV_value_evaluate)
 
         approximation_front_val = np.array(EA_search['F'])
         approximation_front_val = np.unique(approximation_front_val, axis=0)
 
         IGD_value_search = self.problem.calculate_IGD_val(approximation_front=approximation_front_val)
+        IGDp_value_search = self.problem.calculate_IGDp_val(approximation_front=approximation_front_val)
         HV_value_search = self.problem.calculate_HV(approximation_front=approximation_front_val)
         self.IGD_search_history.append(IGD_value_search)
+        self.IGDp_search_history.append(IGDp_value_search)
         self.HV_search_history.append(HV_value_search)
 
         EA_evaluate = {
@@ -427,25 +243,26 @@ class LOMONAS(Algorithm):
     def _finalize(self):
         p.dump([self.nEvals_history, self.IGD_search_history],
                open(f'{self.path_results}/#Evals_and_IGD_search.p', 'wb'))
+        p.dump([self.nEvals_history, self.IGDp_search_history],
+               open(f'{self.path_results}/#Evals_and_IGDp_search.p', 'wb'))
         p.dump([self.nEvals_history, self.HV_search_history],
                open(f'{self.path_results}/#Evals_and_HV_search.p', 'wb'))
-
-        visualize_Elitist_Archive_and_Pareto_Front(AF=self.E_Archive_search_history[-1]['F'],
-                                                   POF=self.problem.opt_pareto_front_val,
-                                                   ylabel='Val Performance',
-                                                   xlabel=self.problem.objective_1,
-                                                   path=self.path_results,
-                                                   fig_name='approximation_front_search.jpg')
 
         visualize_IGD_value_and_nEvals(IGD_history=self.IGD_search_history,
                                        nEvals_history=self.nEvals_history,
                                        path_results=self.path_results,
-                                       fig_name='/#Evals-IGD_search.jpg')
+                                       fig_name='/#Evals-IGD_search')
+
+        visualize_IGD_value_and_nEvals(IGD_history=self.IGDp_search_history,
+                                       nEvals_history=self.nEvals_history,
+                                       path_results=self.path_results,
+                                       ylabel='IGD+ value',
+                                       fig_name='/#Evals-IGDp_search')
 
         visualize_HV_value_and_nEvals(HV_history=self.HV_search_history,
                                       nEvals_history=self.nEvals_history,
                                       path_results=self.path_results,
-                                      fig_name='/#Evals-HV_search.jpg')
+                                      fig_name='/#Evals-HV_search')
 
 #####################################################################################
 def seeking(X_list, F_list):
@@ -514,11 +331,11 @@ def seeking(X_list, F_list):
                 break
 
         if (h is not None) and (l is not None):
-            position = check_above_or_below(considering_pt=non_dominated_front[i],
+            position = checkAboveOrBelow(considering_pt=non_dominated_front[i],
                                             remaining_pt_1=non_dominated_front[l],
                                             remaining_pt_2=non_dominated_front[h])
             if position == -1:
-                angle_measure = calculate_angle_measure(considering_pt=non_dominated_front_norm[i],
+                angle_measure = calculateAngleMeasure(considering_pt=non_dominated_front_norm[i],
                                                         neighbor_1=non_dominated_front_norm[l],
                                                         neighbor_2=non_dominated_front_norm[h])
                 if angle_measure > 210:
@@ -527,7 +344,7 @@ def seeking(X_list, F_list):
     return potential_sols
 
 
-def check_above_or_below(considering_pt, remaining_pt_1, remaining_pt_2):
+def checkAboveOrBelow(considering_pt, remaining_pt_1, remaining_pt_2):
     """
     This function is used to check if the considering point is above or below
     the line connecting two remaining points.\n
@@ -542,7 +359,7 @@ def check_above_or_below(considering_pt, remaining_pt_1, remaining_pt_2):
     return -1
 
 
-def calculate_angle_measure(considering_pt, neighbor_1, neighbor_2):
+def calculateAngleMeasure(considering_pt, neighbor_1, neighbor_2):
     """
     This function is used to calculate the angle measure is created by the considering point
     and two its nearest neighbors
@@ -557,3 +374,174 @@ def calculate_angle_measure(considering_pt, neighbor_1, neighbor_2):
         cosine_angle = 1
     angle = np.arccos(cosine_angle)
     return 360 - np.degrees(angle)
+
+def sample(H, problem):
+    while True:
+        x = problem.sample_a_compact_architecture()
+        if problem.isValid(x):
+            hashKey = get_hashKey(x, problem.name + '*')
+            if hashKey not in H:
+                return x
+
+
+def getPartialNeighbors(x, H, problem):
+    problem_name = problem.name
+    hashKey = get_hashKey(x, problem_name + '*')
+
+    if hashKey in H:
+        if len(H[hashKey]) == 0:
+            return [], H
+        available_idx = H[hashKey]
+        idx_replace = np.random.choice(available_idx)
+        H[hashKey].remove(idx_replace)
+    else:
+        if problem_name == 'NASBench101':
+            available_idx = list(range(len(x)))
+            available_idx.remove(0)
+            available_idx.remove(21)
+        elif problem_name in ['NASBench201', 'MacroNAS', 'NASBenchASR']:
+            available_idx = list(range(len(x)))
+        else:
+            raise ValueError()
+        H[hashKey] = available_idx
+        idx_replace = np.random.choice(H[hashKey])
+        H[hashKey].remove(idx_replace)
+
+    if problem_name == 'NASBench101':
+        if idx_replace in problem.IDX_OPS:
+            available_ops = problem.OPS.copy()
+        else:
+            available_ops = problem.EDGES.copy()
+    elif problem_name == 'NASBenchASR':
+        if idx_replace in problem.IDX_MAIN_OPS:
+            available_ops = problem.MAIN_OPS.copy()
+        else:
+            available_ops = problem.SKIP_OPS.copy()
+    elif problem_name in ['NASBench201', 'MacroNAS']:
+        available_ops = problem.available_ops.copy()
+    else:
+        raise ValueError()
+    available_ops_at_idx_replace = available_ops.copy()
+    available_ops_at_idx_replace.remove(x[idx_replace])
+
+    X_N = []
+    for op in available_ops_at_idx_replace:
+        x_n = x.copy()
+        x_n[idx_replace] = op
+        X_N.append(x_n)
+    return X_N, H
+
+
+def getAllNeighbors(x, H, problem):
+    problem_name = problem.name
+    hashKey = get_hashKey(x, problem_name + '*')
+
+    if hashKey in H:
+        return [], H
+    X_N = []
+
+    if problem_name == 'NASBench101':
+        available_idx = list(range(len(x)))
+        available_idx.remove(0)
+        available_idx.remove(21)
+    elif problem_name in ['NASBench201', 'MacroNAS', 'NASBenchASR']:
+        available_idx = list(range(len(x)))
+    else:
+        raise ValueError()
+
+    for idx_replace in available_idx:
+        if problem_name == 'NASBench101':
+            if idx_replace in problem.IDX_OPS:
+                available_ops = problem.OPS.copy()
+            else:
+                available_ops = problem.EDGES.copy()
+        elif problem_name == 'NASBenchASR':
+            if idx_replace in problem.IDX_MAIN_OPS:
+                available_ops = problem.MAIN_OPS.copy()
+            else:
+                available_ops = problem.SKIP_OPS.copy()
+        elif problem_name in ['NASBench201', 'MacroNAS']:
+            available_ops = problem.available_ops.copy()
+        else:
+            raise ValueError()
+        available_ops_at_idx_replace = available_ops.copy()
+        available_ops_at_idx_replace.remove(x[idx_replace])
+        for op in available_ops_at_idx_replace:
+            x_n = x.copy()
+            x_n[idx_replace] = op
+            X_N.append(x_n)
+    H[hashKey] = X_N
+    return X_N, H
+
+
+####################################### Get architectures for local search #############################################
+
+## Get all architectures
+def getAll4NeighborhoodCheck(X, F, NF):
+    idx_fronts = NonDominatedSorting().do(np.array(F))
+    selected_idx = np.zeros(len(F), dtype=bool)
+    N = min(len(idx_fronts), NF)
+    for i in range(N):
+        for j in idx_fronts[i]:
+            selected_idx[j] = True
+    neighborhoodCheck_X = np.array(X)[selected_idx].tolist()
+    return neighborhoodCheck_X
+
+
+## Get potential architectures (knee and extreme ones)
+def getPotential4NeighborhoodCheck(X, F, NF):
+    neighborhoodCheck_X = []
+
+    idx_fronts = NonDominatedSorting().do(np.array(F))
+    N = min(len(idx_fronts), NF)
+    for i in range(N):
+        selected_idx = np.zeros(len(F), dtype=bool)
+        selected_idx[idx_fronts[i]] = True
+
+        X_front_i = np.array(X)[selected_idx]
+        F_front_i = np.array(F)[selected_idx]
+
+        potential_sols = seeking(X_front_i, F_front_i)
+        potential_sols_list = np.array([info[1] for info in potential_sols])
+
+        for x in potential_sols_list:
+            neighborhoodCheck_X.append(x)
+    return neighborhoodCheck_X
+
+## Get all neighbors (for creating the neighbors dictionary)
+def _getAllNeighbors(problem, x):
+    problem_name = problem.name
+
+    X_N = []
+
+    if problem_name == 'NASBench101':
+        available_idx = list(range(len(x)))
+        available_idx.remove(0)
+        available_idx.remove(21)
+    elif problem_name in ['NASBench201', 'MacroNAS', 'NASBenchASR']:
+        available_idx = list(range(len(x)))
+    else:
+        raise ValueError()
+
+    for idx_replace in available_idx:
+        if problem_name == 'NASBench101':
+            if idx_replace in problem.IDX_OPS:
+                available_ops = problem.OPS.copy()
+            else:
+                available_ops = problem.EDGES.copy()
+        elif problem_name == 'NASBenchASR':
+            if idx_replace in problem.IDX_MAIN_OPS:
+                available_ops = problem.MAIN_OPS.copy()
+            else:
+                available_ops = problem.SKIP_OPS.copy()
+        elif problem_name in ['NASBench201', 'MacroNAS']:
+            available_ops = problem.available_ops.copy()
+        else:
+            raise ValueError()
+        available_ops_at_idx_replace = available_ops.copy()
+        available_ops_at_idx_replace.remove(x[idx_replace])
+        for op in available_ops_at_idx_replace:
+            x_n = x.copy()
+            x_n[idx_replace] = op
+            X_N.append(x_n)
+    return X_N

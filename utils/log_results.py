@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-def visualize_archive(AF, c='tab:blue', xlabel=None, ylabel=None, marker=None, label=None, path=None, fig_name=None):
+def visualize_archive(AF, c='tab:blue', xlabel=None, ylabel=None, title='', marker=None, label=None, path=None, fig_name=None):
     AF_ = np.array(AF)
     AF_[:, 0], AF_[:, 1] = AF_[:, 1], AF_[:, 0].copy()
     AF_ = np.unique(AF_, axis=0)
@@ -23,26 +23,26 @@ def visualize_archive(AF, c='tab:blue', xlabel=None, ylabel=None, marker=None, l
     plt.grid(linestyle='--')
     plt.ylabel(ylabel)
     plt.xlabel(xlabel)
-    plt.title('Approximation Front')
+    plt.title(title)
     if fig_name is None:
         plt.savefig(f'{path}/approximation_front.jpg', bbox_inches='tight', pad_inches=0.1, dpi=300)
     else:
         plt.savefig(f'{path}/{fig_name}.jpg', bbox_inches='tight', pad_inches=0.1, dpi=300)
     plt.clf()
 
-def visualize_IGD_value_and_nEvals(nEvals_history, IGD_history, path_results, fig_name=None):
+def visualize_IGD_value_and_nEvals(nEvals_history, IGD_history, path_results, ylabel='IGD value', fig_name=None):
     """
     - This function is used to visualize 'IGD_values' and 'nEvals' at the end of the search.
     """
     plt.xscale('log')
     plt.xlabel('#Evals')
-    plt.ylabel('IGD value')
+    plt.ylabel(ylabel)
     plt.grid('--')
     plt.step(nEvals_history, IGD_history, where='post')
     if fig_name is None:
         plt.savefig(f'{path_results}/#Evals-IGD.jpg', bbox_inches='tight', pad_inches=0.1, dpi=300)
     else:
-        plt.savefig(f'{path_results}/{fig_name}', bbox_inches='tight', pad_inches=0.1, dpi=300)
+        plt.savefig(f'{path_results}/{fig_name}.jpg', bbox_inches='tight', pad_inches=0.1, dpi=300)
     plt.clf()
 
 def visualize_HV_value_and_nEvals(nEvals_history, HV_history, path_results, fig_name=None):
@@ -57,7 +57,7 @@ def visualize_HV_value_and_nEvals(nEvals_history, HV_history, path_results, fig_
     if fig_name is None:
         plt.savefig(f'{path_results}/#Evals-HV.jpg', bbox_inches='tight', pad_inches=0.1, dpi=300)
     else:
-        plt.savefig(f'{path_results}/{fig_name}', bbox_inches='tight', pad_inches=0.1, dpi=300)
+        plt.savefig(f'{path_results}/{fig_name}.jpg', bbox_inches='tight', pad_inches=0.1, dpi=300)
     plt.clf()
 
 

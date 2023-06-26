@@ -1,14 +1,14 @@
 class Problem:
-    def __init__(self, maxEvals, name, dataset, **kwargs):
+    def __init__(self, max_eval, name, dataset, **kwargs):
         """
         # Hyper-parameters:\n
-        - *maxEvals* -> the maximum number of evaluated architecture.
+        - *max_eval* -> the maximum number of evaluated architecture.
         - *name* -> the name of used benchmark (or problem's name). E.g., MacroNAS, NAS-Bench-101, NAS-Bench-201, NAS-Bench-301.
         - *dataset* -> the dataset is used to train and evaluate architectures. E.g., CIFAR-10; CIFAR-100; ImageNet16-120
         - *objective_0* -> the first objective which we want to minimize. This objective usually is an efficiency metric.
         - *objective_1* -> the second objective which we want to minimize. This objective usually is the architecture's error.
         """
-        self.maxEvals = maxEvals
+        self.max_eval = max_eval
         self.name = name
         self.dataset = dataset
 
@@ -54,6 +54,9 @@ class Problem:
     def calculate_IGD(self, approximation_front):
         return self._calculate_IGD(approximation_front)
 
+    def calculate_IGDp(self, approximation_front):
+        return self._calculate_IGDp(approximation_front)
+
     def _set_up(self):
         pass
 
@@ -73,4 +76,7 @@ class Problem:
         raise NotImplementedError
 
     def _calculate_IGD(self, approximation_front):
+        raise NotImplementedError
+
+    def _calculate_IGDp(self, approximation_front):
         raise NotImplementedError

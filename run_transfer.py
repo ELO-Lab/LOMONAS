@@ -12,7 +12,7 @@ import sys
 def run_transfer_evaluation(path_pre_res, path_res, problem):
     list_dir = os.listdir(path_pre_res)
     assert len(list_dir) != 1, 'Wrong path results!'
-    list_IGD, list_HV, list_best_arch = [], [], []
+    list_IGD, list_IGDp, list_HV, list_best_arch = [], [], [], []
     for fol in list_dir:
         if fol != 'transfer_res':
             sub_path_res = path_pre_res + f'/{fol}'
@@ -31,8 +31,9 @@ def run_transfer_evaluation(path_pre_res, path_res, problem):
             approx_front_transfer = np.unique(approx_front_transfer, axis=0)
             best_arch = min(approx_front_transfer[:, 0])
 
-            IGD_val, HV_val = problem.calculate_IGD(approx_front_transfer), problem.calculate_HV(approx_front_transfer)
+            IGD_val, IGDp_val, HV_val = problem.calculate_IGD(approx_front_transfer), problem.calculate_IGDp(approx_front_transfer), problem.calculate_HV(approx_front_transfer)
             list_IGD.append(IGD_val)
+            list_IGDp.append(IGDp_val)
             list_HV.append(HV_val)
             list_best_arch.append(best_arch)
 
@@ -40,14 +41,16 @@ def run_transfer_evaluation(path_pre_res, path_res, problem):
                 'Approximation Set': approx_set_transfer,
                 'Approximation Front': approx_front_transfer,
                 'Best Performance (Error)': best_arch,
-                'IGD': IGD_val, 'HV': HV_val
+                'IGD': IGD_val, 'IGD+': IGDp_val, 'HV': HV_val
             }
             p.dump(res, open(path_res + f'/transfer_res_{fol}.p', 'wb'))
             logging.info(f'IGD (run {int(fol) + 1}): {np.round(IGD_val, 4)}')
+            logging.info(f'IGD+ (run {int(fol) + 1}): {np.round(IGDp_val, 4)}')
             logging.info(f'HV (run {int(fol) + 1}): {np.round(HV_val, 4)}')
             logging.info(f'Best Performance (Error) (run {int(fol) + 1}): {best_arch}\n')
     print('=*'*70)
     logging.info(f'IGD (average): {np.round(np.mean(list_IGD), 4)} ({np.round(np.std(list_IGD), 4)})')
+    logging.info(f'IGD+ (average): {np.round(np.mean(list_IGDp), 4)} ({np.round(np.std(list_IGDp), 4)})')
     logging.info(f'HV (average): {np.round(np.mean(list_HV), 4)} ({np.round(np.std(list_HV), 4)})')
     logging.info(f'Best Testing Performance (average): {np.round(np.mean(list_best_arch), 4)} ({np.round(np.std(list_best_arch), 4)})')
 

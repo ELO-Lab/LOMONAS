@@ -2,10 +2,10 @@ import copy
 
 
 class Individual:
-    def __init__(self, **kwargs) -> None:
-        self.X = None
-        self.F = None
-        self.hashKey = None
+    def __init__(self, x=None, hashKey=None, f=None, **kwargs) -> None:
+        self.X = x
+        self.F = f
+        self.hashKey = hashKey
         self.data = kwargs
 
     def set(self, key, value):

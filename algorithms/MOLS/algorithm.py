@@ -26,7 +26,7 @@ class Algorithm:
         self.problem = None
 
         self.seed = 0
-        self.nEvals = 0
+        self.n_eval = 0
 
         self.path_results = None
         self.debug = False
@@ -49,6 +49,7 @@ class Algorithm:
 
         self.E_Archive_evaluate_history = []
         self.IGD_evaluate_history = []
+        self.IGDp_evaluate_history = []
         self.HV_evaluate_history = []
 
         self.E_Archive_evaluate_each_gen = []
@@ -60,7 +61,7 @@ class Algorithm:
 
     def reset(self):
         self.seed = 0
-        self.nEvals = 0
+        self.n_eval = 0
 
         self.path_results = None
 
@@ -81,6 +82,7 @@ class Algorithm:
         self.E_Archive_evaluate_history = []
 
         self.IGD_evaluate_history = []
+        self.IGDp_evaluate_history = []
         self.HV_evaluate_history = []
 
         self._reset()
@@ -111,6 +113,8 @@ class Algorithm:
     def finalize(self):
         p.dump([self.nEvals_history, self.IGD_evaluate_history],
                open(f'{self.path_results}/#Evals_and_IGD.p', 'wb'))
+        p.dump([self.nEvals_history, self.IGDp_evaluate_history],
+               open(f'{self.path_results}/#Evals_and_IGDp.p', 'wb'))
         p.dump([self.nEvals_history, self.HV_evaluate_history],
                open(f'{self.path_results}/#Evals_and_HV.p', 'wb'))
 
@@ -122,15 +126,28 @@ class Algorithm:
         p.dump([self.nEvals_history, self.E_Archive_evaluate_history],
                open(f'{self.path_results}/#Evals_and_Elitist_Archive_evaluate.p', 'wb'))
 
+        visualize_Elitist_Archive_and_Pareto_Front(AF=self.E_Archive_search_history[-1]['F'],
+                                                   POF=self.problem.opt_pareto_front_val,
+                                                   ylabel='Val Performance',
+                                                   xlabel=self.problem.objective_1,
+                                                   path=self.path_results,
+                                                   fig_name='AF-POF_search')
+
         visualize_Elitist_Archive_and_Pareto_Front(AF=self.E_Archive_evaluate_history[-1]['F'],
                                                    POF=self.problem.opt_pareto_front,
                                                    ylabel='Test Performance',
                                                    xlabel=self.problem.objective_1,
-                                                   path=self.path_results)
+                                                   path=self.path_results,
+                                                   fig_name='AF-POF')
 
         visualize_IGD_value_and_nEvals(IGD_history=self.IGD_evaluate_history,
                                        nEvals_history=self.nEvals_history,
                                        path_results=self.path_results)
+        visualize_IGD_value_and_nEvals(IGD_history=self.IGD_evaluate_history,
+                                       nEvals_history=self.nEvals_history,
+                                       path_results=self.path_results,
+                                       ylabel='IGD+ value',
+                                       fig_name='#Evals-IGDp')
         visualize_HV_value_and_nEvals(HV_history=self.HV_evaluate_history,
                                       nEvals_history=self.nEvals_history,
                                       path_results=self.path_results)
