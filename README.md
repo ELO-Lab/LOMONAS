@@ -11,50 +11,53 @@ In GECCO 2023.
 $ pip install -r requirements.txt
 ```
 -  Download databases in this [link](https://drive.google.com/drive/folders/1jAX-By0UUOld_vLRLBLX1GppQ6lhcOvS?usp=sharing), unzip and put all folders into ```data``` folder for building APIs (benchmarks).
-## Search
-### Evolution-based MONAS (NSGA-II & MOEA/D)
-```shell
-$ python run_EMONAS.py
---optimizer [MOEA_NSGAII, MOEA_MOEAD] <search_strategy>
---pop_size <population_size, default: 20>
---problem [NAS101, NAS201-C10, NAS201-C100, NAS201-IN16, MacroNAS-C10, MacroNAS-C100, NAS-ASR] <experiment_problem>
---maxEvals <maximum_number_of_evaluations, default: 3000>
---seed <initial_random_seed, default: 0>
---n_runs <number_of_experiment_runs, default: 31>
---path_api_benchmark <path_of_benchmark_databases, default: ./data>
---path_results <path_of_experimental_results, default: ./exp_rs>
-```
-### LOMONAS & Random Restart Local Search (RR-LS)
-```shell
-$ python run_MOLS.py
---optimizer [LOMONAS, RR_LS] <search_strategy>
---NF <number_of_kept_fronts (for LOMONAS only), default: 3>
---get_all_neighbors <check_all_neighbors? (for LOMONAS only), default: 0>
---local_search_on_all_sols <perform_local_search_on_all_solutions? (for LOMONAS only)', default: 0>
---loop <RR-LS_with_loop? (for RR-LS only)', default: 0>
---problem [NAS101, NAS201-C10, NAS201-C100, NAS201-IN16, MacroNAS-C10, MacroNAS-C100, NAS-ASR] <experiment_problem>
---maxEvals <maximum_number_of_evaluations, default: 3000>
---seed <initial_random_seed, default: 0>
---n_runs <number_of_experiment_runs, default: 31>
---path_api_benchmark <path_of_benchmark_databases, default: ./data>
---path_results <path_of_experimental_results, default: ./exp_rs>
-```
-The configurations of LOMONAS proposed in paper are ```--NF 3```, ```--get_all_neighbors 0```, and ```--local_search_on_all_sols 0```.
 
-Example script of performing LOMONAS on NAS-Bench-201 search space (CIFAR-100):
+In our experiments, we do not implement directly the API benchmarks published in their repos (e.g., NAS-Bench-101, NAS-Bench-201, etc).
+Instead, we create smaller-size databases by accessing their databases and only logging necessary content.
+
+You can compare our databases and the original databases in [check_log_database.ipynb](check_log_database.ipynb)
+## Reproducing the results
+You can reproduce our results by running the below script:
 ```shell
-$ python run_MOLS.py --optimizer LOMONAS --NF 3 --get_all_neighbors 0 --local_search_on_all_sols 0 --problem NAS201-C100
+$ python main.py --optimizer [MOEA_NSGAII, MOEA_MOEAD, RR_LS, LOMONAS] --problem [NAS101, MacroNAS-C10, MacroNAS-C100, NAS201-C10, NAS201-C100, NAS201-IN16, NAS-ASR]
 ```
+## Search with different hyperparameters
+Moreover, you can search with different hyperparameter settings
+### For environment
+- `n_run`: the number times of running algorithms (default: `31`)
+- `max_eval`: the maximum number of evaluation each run (default: `3000`)
+- `init_seed`: the initial random seed (default: `0`)
+- `api_benchmark_path`: the path that contains the api databases (default: `./data`)
+- `res_path`: the path for logging results (default: `./exp_res`)
+- `debug`: print the search performance at each generation if `debug` is `True` (default: `False`)
+### For evolution-based MONAS (NSGA-II & MOEA/D)
+- `pop_size`: the population size
+### For [Random Restart - Local Search](https://github.com/tdenottelander/MacroNAS)
+- `loop`: implement the loop RR-LS variant if `loop` is `True` (default: `False`)
+### For LOMONAS
+- `NF`: the number of fronts kept for performing neighborhood checks (default: `3`)
+- `check_all_neighbors`: evaluate all solutions in the neighborhood if set `True` (default: `False`)
+- `neighborhood_check_on_all_sols`: perform neighborhood check on all solutions instead of knee and extremes ones if set `True` (default: `False`)
+
+The results of LOMONAS in the paper are run with the default hyperparameters.
+
 ## Transferability Evaluation
-```shell
-$ python run_transfer.py
---problem [NAS201-C100, NAS201-IN16, MacroNAS-C100] <experiment_problem>
---path_api_benchmark <path_of_benchmark_databases, default: ./data>
---path_pre_results <path_of_previous_experimental_results>
-```
-In our study, we evaluate the transferability of algorithms by evaluating the search results (on CIFAR-10) on CIFAR-100 and ImageNet16-120 (for NAS-Bench-201 only).
+In our study, we evaluate the transferability of algorithms by evaluating the found architectures (search on CIFAR-10) on CIFAR-100 (for MacroNAS and NAS-201) and ImageNet16-120 (for NAS-201 only).
 
-```--path_pre_results``` must contain the search results at NAS201-C10 or MacroNAS-C10 problems.
+```shell
+$ python transferability_evaluation.py
+--problem [MacroNAS-C100, NAS201-C100, NAS201-IN16]
+--api_benchmark_path <path_of_benchmark_databases, default: ./data>
+--cifar10_res_path
+```
+Note: ```--cifar10_res_path``` must contain the searching result at MacroNAS-C10 or NAS201-C10 problems.
+
+For example:
+```shell
+$ python transferability_evaluation.py --problem NAS201-C100 --cifar10_res_path ./exp_res/NAS201-C10 --api_benchmark_path ./data
+```
+## Visualization and T-test
+You can create all figures presented in our paper by run the [visualization_and_statistical_test.ipynb](visualization_and_statistical_test.ipynb) file.
 
 ## Acknowledgement
 Our source code is inspired by:

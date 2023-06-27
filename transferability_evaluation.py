@@ -9,7 +9,7 @@ import logging
 import sys
 
 
-def run_transfer_evaluation(path_pre_res, path_res, problem):
+def run(path_pre_res, path_res, problem):
     list_dir = os.listdir(path_pre_res)
     assert len(list_dir) != 1, 'Wrong path results!'
     list_IGD, list_IGDp, list_HV, list_best_arch = [], [], [], []
@@ -62,42 +62,38 @@ def main(kwargs):
     else:
         raise ValueError()
 
-    if kwargs.path_pre_results is None:
+    if kwargs.cifar10_res_path is None:
         raise ValueError('Please conduct experiments on NAS-Bench-201 (CIFAR-10) or MacroNAS (CIFAR-10) first!')
     else:
-        try:
-            os.makedirs(f'{kwargs.path_pre_results}/transfer_res/{kwargs.problem}')
-        except FileExistsError:
-            pass
-        PATH_PRE_RESULTS = kwargs.path_pre_results
-        PATH_RESULTS = f'{kwargs.path_pre_results}/transfer_res/{kwargs.problem}'
+        cifar10_res_path = kwargs.cifar10_res_path
+        res_path = f'{kwargs.cifar10_res_path}/{kwargs.problem}_transferred'
 
     ''' ============================================== Set up problem ============================================== '''
-    path_pof = root_project + '/data/POF'
+    pof_path = root_project + '/data/POF'
     if kwargs.path_api_benchmark is None:
-        path_api_benchmark = root_project + '/data'
+        api_benchmark_path = root_project + '/data'
     else:
-        path_api_benchmark = kwargs.path_api_benchmark
+        api_benchmark_path = kwargs.path_api_benchmark
 
     problem = get_problems(problem_name=kwargs.problem, maxEvals=0,
-                           path_api_benchmark=path_api_benchmark,
-                           path_pareto_optimal_front=path_pof)
+                           api_benchmark_path=api_benchmark_path,
+                           pof_path=pof_path)
     problem.set_up()
 
     ''' ============================================== Transfer ============================================== '''
-    run_transfer_evaluation(PATH_PRE_RESULTS, PATH_RESULTS, problem)
+    run(cifar10_res_path, res_path, problem)
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
     ''' PROBLEM '''
-    parser.add_argument('--problem', type=str, default='NAS201-C10', help='the problem name',
+    parser.add_argument('--problem', type=str, default='NAS201-C100', help='the problem name',
                         choices=['NAS201-C100', 'NAS201-IN16', 'MacroNAS-C100'])
 
     ''' ENVIRONMENT '''
-    parser.add_argument('--path_api_benchmark', type=str, default=None, help='path for loading api benchmark')
-    parser.add_argument('--path_pre_results', type=str, default=None, help='path of pre-results')
+    parser.add_argument('--api_benchmark_path', type=str, default=None, help='path for loading api benchmark')
+    parser.add_argument('--cifar10_res_path', type=str, default=None)
     args = parser.parse_args()
 
     log_format = '%(asctime)s %(message)s'
