@@ -12,23 +12,23 @@ import time
 
 def sample(problem):
     while True:
-        X = problem.sample_a_compact_architecture()
-        if problem.isValid(X):
-            return X
+        x = problem.sample_a_compact_architecture()
+        if problem.isValid(x):
+            return x
 
-def get_available_idx(X, problem):
+def get_available_idx(x, problem):
     problem_name = problem.name
     if problem_name == 'NASBench101':
-        available_idx = list(range(len(X)))
+        available_idx = list(range(len(x)))
         available_idx.remove(0)
         available_idx.remove(21)
     elif problem_name in ['NASBench201', 'MacroNAS', 'NASBenchASR']:
-        available_idx = list(range(len(X)))
+        available_idx = list(range(len(x)))
     else:
         raise ValueError()
     return available_idx
 
-def get_available_ops(X, idx, problem):
+def get_available_ops(x, idx, problem):
     problem_name = problem.name
 
     if problem_name == 'NASBench101':
@@ -46,7 +46,7 @@ def get_available_ops(X, idx, problem):
     else:
         raise ValueError()
     available_ops_at_idx_replace = available_ops.copy()
-    available_ops_at_idx_replace.remove(X[idx])
+    available_ops_at_idx_replace.remove(x[idx])
     return available_ops_at_idx_replace
 
 
@@ -59,39 +59,33 @@ class RR_LS(LOMONAS):
         super().__init__(**kwargs)
 
         # Default: f0 -> performance metric; f1 -> efficiency metric
-        self.f0, self.f1 = None, None
         self.loop = False
 
-    def _reset(self):
-        pass
+    def scalarize_fitness(self, f, scalar_coff):
+        f_0 = f[0]
+        f_1 = self.problem.normalize_efficiency_metric(f[1])
+        return f_0 * scalar_coff + f_1 * (1 - scalar_coff)
 
-    def scalarize_fitness(self, F, scalar_coff):
-        F_0 = F[0]
-        F_1 = self.problem.normalize_efficiency_metric(F[1])
-        return F_0 * scalar_coff + F_1 * (1 - scalar_coff)
-
-    def dominates(self, F_indThis, F_indOther, scalarization):
-        scalar_F_this = self.scalarize_fitness(F_indThis, scalarization)
-        scalar_F_other = self.scalarize_fitness(F_indOther, scalarization)
-        return scalar_F_this < scalar_F_other
+    def dominates(self, f_indThis, f_indOther, scalarization):
+        scalar_f_this = self.scalarize_fitness(f_indThis, scalarization)
+        scalar_f_other = self.scalarize_fitness(f_indOther, scalarization)
+        return scalar_f_this < scalar_f_other
 
     def _solve(self):
         self.start_executed_time_algorithm = time.time()
 
         ls_archive = []
-        while self.nEvals < self.problem.maxEvals:
+        while self.n_eval < self.problem.max_eval:
             # 1. Initialize a random architecture
-            X = sample(self.problem)
-            F = self.evaluate(X)
+            x = sample(self.problem)
+            f = self.evaluate(x)
 
             # Update Archive
-            arch = Individual()
-            arch.set('X', X)
-            arch.set('F', F)
+            arch = Individual(x=x, f=f)
             self.E_Archive_search.update(arch, algorithm=self, problem_name=self.problem.name)
 
-            best_X = arch.X.copy()
-            best_F = arch.F.copy()
+            best_x = arch.X.copy()
+            best_f = arch.F.copy()
 
             change = True
             while change:
@@ -100,37 +94,42 @@ class RR_LS(LOMONAS):
                 scalar_coef = np.random.uniform()
 
                 # 3. Consider all variables in random order
-                idx_list = np.random.permutation(get_available_idx(best_X, self.problem))
+                idx_list = np.random.permutation(get_available_idx(best_x, self.problem))
 
                 for i in idx_list:
-                    X_copy = best_X.copy()
-                    ops_list = get_available_ops(X_copy, i, self.problem)
+                    x_copy = best_x.copy()
+                    ops_list = get_available_ops(x_copy, i, self.problem)
                     for op in ops_list:
-                        X_copy[i] = op
-                        if self.problem.isValid(X_copy):
-                            F = self.evaluate(X_copy)
+                        x_copy[i] = op
+                        if self.problem.isValid(x_copy):
+                            f = self.evaluate(x_copy)
 
                             # Update Archive
-                            arch = Individual()
-                            arch.set('X', X_copy.copy())
-                            arch.set('F', F.copy())
+                            arch = Individual(x=x_copy.copy(), f=f.copy())
                             self.E_Archive_search.update(arch, algorithm=self, problem_name=self.problem.name)
 
                             # 3.1. For each variable xi, evaluate the net obtained by setting xi to each option in Ωi.
                             # Keep the best according to α × f1 + (1 − α) × f2
-                            if self.dominates(F, best_F, scalar_coef):
-                                best_X = X_copy.copy()
-                                best_F = F.copy()
+                            if self.dominates(f, best_f, scalar_coef):
+                                best_x = x_copy.copy()
+                                best_f = f.copy()
                                 if self.loop:
                                     change = True
                 idv = {
-                    'X': best_X,
-                    'F': best_F
+                    'x': best_x,
+                    'f': best_f
                 }
                 ls_archive.append(idv)
                 if self.debug:
-                    print(f'-------------------------------------------------------------')
-                    print(f'-> nEvals / maxEvals: {self.nEvals}/{self.problem.maxEvals}')
+                    content = [
+                        self.n_eval,
+                        self.IGD_search_history[-1], self.IGDp_search_history[-1], self.HV_search_history[-1],
+                        self.IGD_search_history[-1], self.IGDp_evaluate_history[-1], self.HV_evaluate_history[-1]
+                    ]
+                    print("-" * 150)
+                    print(
+                        "\033[92m{:<10}\033[00m | \033[96m{:^20.6f}\033[00m | \033[96m{:^20.6f}\033[00m | \033[96m{:^20.6f}\033[00m | \033[93m{:^20.6f}\033[00m | \033[93m{:^20.6f}\033[00m | \033[93m{:^20.6f}\033[00m |".format(
+                            *content))
 
         self.finalize()
         results = {

@@ -1,8 +1,10 @@
 import numpy as np
 import pickle as p
 from problems.NAS_problem import Problem
-from utils import calculate_IGD_value, get_hashKey
+from utils import get_hashKey
 from pymoo.indicators.hv import HV
+from pymoo.indicators.igd import IGD
+from pymoo.indicators.igd_plus import IGDPlus
 
 from api_benchmarks.api_101 import wrap_api as api
 
@@ -16,7 +18,7 @@ reference_point = [1.01, 1.01]
 HV_cal = HV(reference_point)
 
 class NASBench101(Problem):
-    def __init__(self, maxEvals, dataset='CIFAR-10', **kwargs):
+    def __init__(self, max_eval, dataset='CIFAR-10', **kwargs):
         """
         # NAS-Benchmark-101 provides us the information (e.g., the testing accuracy, the validation accuracy,
         the number of parameters) of all architectures in the search space. Therefore, if we want to evaluate any
@@ -33,7 +35,7 @@ class NASBench101(Problem):
         - maxLength -> the maximum length of compact architecture.
         """
 
-        super().__init__(maxEvals, 'NASBench101', dataset, **kwargs)
+        super().__init__(max_eval, 'NASBench101', dataset, **kwargs)
 
         self.objective_0 = 'Test Error'
         self.objective_1 = '#Params'
@@ -46,8 +48,8 @@ class NASBench101(Problem):
 
         self.maxLength = 28
 
-        self.data_path = kwargs['path_api_benchmark'] + '/NASBench101'
-        self.pareto_opt_front_path = kwargs['path_pareto_optimal_front']
+        self.path_data = kwargs['api_benchmark_path'] + '/NASBench101'
+        self.pof_path = kwargs['pof_path']
 
         self.min_params, self.max_params = None, None
 
@@ -60,11 +62,11 @@ class NASBench101(Problem):
         self.efficiency_cache = {}
 
     def _set_up(self):
-        self.api = api.NASBench_(self.data_path + '/data.p')
+        self.api = api.NASBench_(self.path_data + '/data.p')
 
         self.min_params, self.max_params = 227274, 49979274
 
-        f_opt_pareto_front = open(f'{self.pareto_opt_front_path}/[POF_TestAcc_Params]_[NAS101].p', 'rb')
+        f_opt_pareto_front = open(f'{self.pof_path}/[POF_TestAcc_Params]_[NAS101].p', 'rb')
         self.opt_pareto_front = p.load(f_opt_pareto_front)
         f_opt_pareto_front.close()
 
@@ -72,7 +74,7 @@ class NASBench101(Problem):
         self.opt_pareto_front_norm[:, 1] = np.round((self.opt_pareto_front_norm[:, 1] - self.min_params) / (self.max_params - self.min_params), 4)
         self.opt_pareto_front_norm = np.round(self.opt_pareto_front_norm, 6)
 
-        f_opt_pareto_front_val = open(f'{self.pareto_opt_front_path}/[POF_ValAcc_Params]_[NAS101].p', 'rb')
+        f_opt_pareto_front_val = open(f'{self.pof_path}/[POF_ValAcc_Params]_[NAS101].p', 'rb')
         self.opt_pareto_front_val = p.load(f_opt_pareto_front_val)
         f_opt_pareto_front_val.close()
 
@@ -80,6 +82,12 @@ class NASBench101(Problem):
         self.opt_pareto_front_val_norm[:, 1] = np.round(
             (self.opt_pareto_front_val_norm[:, 1] - self.min_params) / (self.max_params - self.min_params), 4)
         self.opt_pareto_front_val_norm = np.round(self.opt_pareto_front_val_norm, 6)
+
+        self.IGD_calc = IGD(self.opt_pareto_front_norm)
+        self.IGD_s_calc = IGD(self.opt_pareto_front_val_norm)
+
+        self.IGDp_calc = IGDPlus(self.opt_pareto_front_norm)
+        self.IGDp_s_calc = IGDPlus(self.opt_pareto_front_val_norm)
 
         print('--> Set Up - Done')
 
@@ -164,8 +172,17 @@ class NASBench101(Problem):
         approximation_front = np.round(approximation_front, 4)
         if self.opt_pareto_front is None:
             return -1
-        IGD = calculate_IGD_value(pareto_optimal_front=self.opt_pareto_front_norm, approximation_front=approximation_front)
-        return IGD
+        IGD_value = self.IGD_calc(approximation_front)
+        return IGD_value
+
+    def _calculate_IGDp(self, approximation_front):
+        approximation_front = np.array(approximation_front)
+        approximation_front[:, 1] = (approximation_front[:, 1] - self.min_params) / (self.max_params - self.min_params)
+        approximation_front = np.round(approximation_front, 4)
+        if self.opt_pareto_front is None:
+            return -1
+        IGDp_value = self.IGDp_calc(approximation_front)
+        return IGDp_value
 
     def calculate_IGD_val(self, approximation_front):
         approximation_front = np.array(approximation_front)
@@ -173,8 +190,17 @@ class NASBench101(Problem):
         approximation_front = np.round(approximation_front, 4)
         if self.opt_pareto_front_val is None:
             return -1
-        IGD = calculate_IGD_value(pareto_optimal_front=self.opt_pareto_front_val_norm, approximation_front=approximation_front)
-        return IGD
+        IGD_value = self.IGD_s_calc(approximation_front)
+        return IGD_value
+
+    def calculate_IGDp_val(self, approximation_front):
+        approximation_front = np.array(approximation_front)
+        approximation_front[:, 1] = (approximation_front[:, 1] - self.min_params) / (self.max_params - self.min_params)
+        approximation_front = np.round(approximation_front, 4)
+        if self.opt_pareto_front_val is None:
+            return -1
+        IGDp_value = self.IGDp_s_calc(approximation_front)
+        return IGDp_value
 
     def calculate_HV(self, approximation_front):
         approximation_front = np.array(approximation_front)

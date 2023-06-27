@@ -1,4 +1,8 @@
 from problems import NASBench101, NASBench201, MacroNAS, NASBenchASR
+from operators.crossover import PointCrossover
+from operators.mutation import BitStringMutation
+from operators.sampling.random_sampling import RandomSampling
+from operators.selection import RankAndCrowdingSurvival
 
 objectives4algorithm = {
     'NASBench101': {
@@ -27,9 +31,9 @@ objectives4algorithm = {
     },
 }
 
-def get_problems(problem_name, maxEvals=3000, **kwargs):
+def get_problems(problem_name, max_eval=3000, **kwargs):
     if problem_name == 'NAS101':
-        return NASBench101(dataset='CIFAR-10', maxEvals=maxEvals, **kwargs)
+        return NASBench101(dataset='CIFAR-10', max_eval=max_eval, **kwargs)
     elif 'NAS201' in problem_name:
         if 'C100' in problem_name:
             dataset = 'CIFAR-100'
@@ -39,7 +43,7 @@ def get_problems(problem_name, maxEvals=3000, **kwargs):
             dataset = 'ImageNet16-120'
         else:
             raise ValueError
-        return NASBench201(dataset=dataset, maxEvals=maxEvals, **kwargs)
+        return NASBench201(dataset=dataset, max_eval=max_eval, **kwargs)
     elif 'MacroNAS' in problem_name:
         if 'C100' in problem_name:
             dataset = 'CIFAR-100'
@@ -47,27 +51,59 @@ def get_problems(problem_name, maxEvals=3000, **kwargs):
             dataset = 'CIFAR-10'
         else:
             raise ValueError
-        return MacroNAS(dataset=dataset, maxEvals=maxEvals, **kwargs)
+        return MacroNAS(dataset=dataset, max_eval=max_eval, **kwargs)
     elif 'NAS-ASR' in problem_name:
-        return NASBenchASR(dataset='TIMIT', maxEvals=maxEvals, **kwargs)
+        return NASBenchASR(dataset='TIMIT', max_eval=max_eval, **kwargs)
     else:
         raise ValueError(f'Not supporting this problem - {problem_name}.')
 
 def get_optimizer(optimizer_name, **kwargs):
-    if optimizer_name == 'MOEA_NSGAII':
-        from algorithms.MOEAs import NSGA_Net
-        return NSGA_Net(name=optimizer_name)
-    elif optimizer_name == 'MOEA_MOEAD':
-        from algorithms.MOEAs import MOEAD_Net
-        return MOEAD_Net(name=optimizer_name)
+    if 'MOEA' in optimizer_name:
+        pop_size = kwargs['pop_size']
+        sampling = RandomSampling()
+        crossover = PointCrossover('2X')
+        mutation = BitStringMutation()
+        if 'NSGAII' in optimizer_name:
+            from algorithms.MOEAs import NSGA_Net
+            survival = RankAndCrowdingSurvival()
+            optimizer = NSGA_Net(name=optimizer_name)
+            optimizer.set_hyperparameters(
+                pop_size=pop_size,
+                sampling=sampling,
+                crossover=crossover,
+                mutation=mutation,
+                survival=survival,
+                debug=bool(kwargs['debug'])
+            )
+        elif 'MOEAD' in optimizer_name:
+            from algorithms.MOEAs import MOEAD_Net
+            optimizer = MOEAD_Net(name=optimizer_name)
+            optimizer.set_hyperparameters(
+                pop_size=pop_size,
+                sampling=sampling,
+                crossover=crossover,
+                mutation=mutation,
+                debug=bool(kwargs['debug'])
+            )
     elif optimizer_name == 'LOMONAS':
         from algorithms.MOLS import LOMONAS
-        return LOMONAS(name=optimizer_name)
+        optimizer = LOMONAS(name=optimizer_name)
+        optimizer.set_hyperparameters(
+            NF=kwargs['NF'],
+            check_all_neighbors=bool(kwargs['check_all_neighbors']),
+            neighborhood_check_on_all_sols=bool(kwargs['neighborhood_check_on_all_sols']),
+            debug=bool(kwargs['debug']),
+        )
     elif optimizer_name == 'RR_LS':
         from algorithms.MOLS import RR_LS
-        return RR_LS(name=optimizer_name)
+        optimizer = RR_LS(name=optimizer_name)
+        optimizer.set_hyperparameters(
+            loop=bool(kwargs['loop']),
+            debug=bool(kwargs['debug'])
+        )
     else:
         raise ValueError(f'Not supporting this algorithm - {optimizer_name}.')
+    return optimizer
 
 def get_objectives(problem_name, optimizer_name):
     return objectives4algorithm[problem_name][optimizer_name]

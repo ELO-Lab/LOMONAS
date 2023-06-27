@@ -4,9 +4,9 @@ def arch_2_key(arch):
     return ''.join(map(str, arch))
 
 class API:
-    def __init__(self, data_path, dataset):
+    def __init__(self, path_data, dataset):
         self.dataset = dataset
-        self.api = p.load(open(data_path + f'/[{dataset}]_data.p', 'rb'))
+        self.api = p.load(open(path_data + f'/[{dataset}]_data.p', 'rb'))
 
     def get_test_accuracy(self, arch, iepoch=-1):
         keyData = arch_2_key(arch)
@@ -20,6 +20,10 @@ class API:
     def get_training_loss(self, arch, iepoch=-1):
         keyData = arch_2_key(arch)
         return self.api['200'][keyData]['train_loss'][iepoch - 1], self.get_training_time(keyData=keyData, iepoch=iepoch)
+
+    def get_val_loss(self, arch, iepoch=-1):
+        keyData = arch_2_key(arch)
+        return self.api['200'][keyData]['val_loss'][iepoch - 1], self.get_training_time(keyData=keyData, iepoch=iepoch)
 
     def get_val_accuracy(self, arch, iepoch=-1):
         keyData = arch_2_key(arch)

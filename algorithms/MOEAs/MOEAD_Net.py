@@ -29,9 +29,6 @@ class MOEAD_Net(NSGA_Net):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
-        # Default: f0 -> performance metric; f1 -> efficiency metric
-        self.f0, self.f1 = None, None
-
         self.prob_neighbor_mating = 0.9
 
         self.decomposition = None
@@ -42,6 +39,9 @@ class MOEAD_Net(NSGA_Net):
     def _reset(self):
         self.decomposition = None
         self.ideal = None
+        self.IGD_search_history = []
+        self.IGDp_search_history = []
+        self.HV_search_history = []
 
     def _setup(self):
         self.sampling.nSamples = self.pop_size
@@ -55,8 +55,8 @@ class MOEAD_Net(NSGA_Net):
         self.initialize()
 
         self.do_each_gen()
-        while self.nEvals < self.problem.maxEvals:
-            self.nGens += 1
+        while self.n_eval < self.problem.max_eval:
+            self.n_gen += 1
             self.next(self.pop)
             self.do_each_gen()
         self.finalize()

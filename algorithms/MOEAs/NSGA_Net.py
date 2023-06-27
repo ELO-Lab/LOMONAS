@@ -3,9 +3,11 @@ Modified from: https://github.com/msu-coinlab/pymoo
 """
 import time
 import numpy as np
+import pickle as p
 
 from algorithms.MOEAs import Algorithm
-
+from utils import ElitistArchive, Individual
+from utils import visualize_IGD_value_and_nEvals, visualize_HV_value_and_nEvals
 
 def compare(idv_1, idv_2):
     rank_1, rank_2 = idv_1.get('rank'), idv_2.get('rank')
@@ -42,8 +44,14 @@ class NSGA_Net(Algorithm):
         # Default: f0 -> performance metric; f1 -> efficiency metric
         self.f0, self.f1 = None, None
 
+        self.IGD_search_history = []
+        self.IGDp_search_history = []
+        self.HV_search_history = []
+
     def _reset(self):
-        pass
+        self.IGD_search_history = []
+        self.IGDp_search_history = []
+        self.HV_search_history = []
 
     def _setup(self):
         self.sampling.nSamples = self.pop_size
@@ -61,7 +69,7 @@ class NSGA_Net(Algorithm):
         efficiency_metric = self.problem.get_efficiency_metric(arch=arch)
 
         self.executed_time_algorithm_history.append(executed_time_algorithm)
-        self.nEvals += 1
+        self.n_eval += 1
         self.benchmark_time_algorithm_history.append(self.benchmark_time_algorithm_history[-1] + benchmark_time)
         self.indicator_time_history.append(self.indicator_time_history[-1] + indicator_time)
         self.evaluated_time_history.append(self.evaluated_time_history[-1] + benchmark_time + indicator_time)
@@ -76,8 +84,8 @@ class NSGA_Net(Algorithm):
         self.pop = self.survival.do(self.pop, self.pop_size)
 
         self.do_each_gen()
-        while self.nEvals < self.problem.maxEvals:
-            self.nGens += 1
+        while self.n_eval < self.problem.max_eval:
+            self.n_gen += 1
             self.next(self.pop)
             self.do_each_gen()
         self.finalize()
@@ -126,15 +134,91 @@ class NSGA_Net(Algorithm):
 
     def _do_each_gen(self):
         if self.debug:
-            print(f'------ Gen {self.nGens} ------')
-            print(f'-> nEvals / maxEvals: {self.nEvals}/{self.problem.maxEvals}')
-            print()
+            content = [
+                self.n_eval,
+                self.IGD_search_history[-1], self.IGDp_search_history[-1], self.HV_search_history[-1],
+                self.IGD_search_history[-1], self.IGDp_evaluate_history[-1], self.HV_evaluate_history[-1]
+            ]
+            print("-" * 150)
+            print(
+                "\033[92m{:<10}\033[00m | \033[96m{:^20.6f}\033[00m | \033[96m{:^20.6f}\033[00m | \033[96m{:^20.6f}\033[00m | \033[93m{:^20.6f}\033[00m | \033[93m{:^20.6f}\033[00m | \033[93m{:^20.6f}\033[00m |".format(
+                    *content))
 
     def log_elitist_archive(self, **kwargs):
-        pass
+        E_Archive_evaluate = ElitistArchive(log_each_change=False)
+
+        self.nEvals_history.append(self.n_eval)
+
+        EA_search = {
+            'X': self.E_Archive_search.X.copy(),
+            'hashKey': self.E_Archive_search.hashKey.copy(),
+            'F': self.E_Archive_search.F.copy(),
+        }
+        self.E_Archive_search_history.append(EA_search)
+
+        """  In practice, these below steps are unworkable """
+        # Evaluation Step (to visualize the trend of IGD, do not affect the process of NAS search)
+        dummy_idv = Individual()
+        ## Evaluate each architecture in the Elitist Archive
+        for arch in EA_search['X']:
+            X = arch
+            test_error = self.problem.get_test_performance(arch=X)
+            efficiency_metric = self.problem.get_efficiency_metric(arch=X)
+            F = test_error + efficiency_metric
+            dummy_idv.set('X', X)
+            dummy_idv.set('F', F)
+            E_Archive_evaluate.update(dummy_idv, problem_name=self.problem.name)
+
+        ## Calculate the IGD indicator.
+        ## In practice, these steps are unworkable because we do not have the Pareto-optimal front
+        approximation_front = np.array(E_Archive_evaluate.F)
+        approximation_front = np.unique(approximation_front, axis=0)
+
+        IGD_value_evaluate = self.problem.calculate_IGD(approximation_front=approximation_front)
+        IGDp_value_evaluate = self.problem.calculate_IGDp(approximation_front=approximation_front)
+        HV_value_evaluate = self.problem.calculate_HV(approximation_front=approximation_front)
+        self.IGD_evaluate_history.append(IGD_value_evaluate)
+        self.IGDp_evaluate_history.append(IGDp_value_evaluate)
+        self.HV_evaluate_history.append(HV_value_evaluate)
+
+        approximation_front_val = np.array(EA_search['F'])
+        approximation_front_val = np.unique(approximation_front_val, axis=0)
+
+        IGD_value_search = self.problem.calculate_IGD_val(approximation_front=approximation_front_val)
+        IGDp_value_search = self.problem.calculate_IGDp_val(approximation_front=approximation_front_val)
+        HV_value_search = self.problem.calculate_HV(approximation_front=approximation_front_val)
+        self.IGD_search_history.append(IGD_value_search)
+        self.IGDp_search_history.append(IGDp_value_search)
+        self.HV_search_history.append(HV_value_search)
+
+        EA_evaluate = {
+            'X': E_Archive_evaluate.X.copy(),
+            'hashKey': E_Archive_evaluate.hashKey.copy(),
+            'F': E_Archive_evaluate.F.copy()
+        }
+        self.E_Archive_evaluate_history.append(EA_evaluate)
 
     def _finalize(self):
-        pass
+        p.dump([self.nEvals_history, self.IGD_search_history],
+               open(f'{self.path_results}/#Evals_and_IGD_search.p', 'wb'))
+        p.dump([self.nEvals_history, self.IGDp_search_history],
+               open(f'{self.path_results}/#Evals_and_IGDp_search.p', 'wb'))
+        p.dump([self.nEvals_history, self.HV_search_history],
+               open(f'{self.path_results}/#Evals_and_HV_search.p', 'wb'))
+
+        visualize_IGD_value_and_nEvals(IGD_history=self.IGD_search_history,
+                                       nEvals_history=self.nEvals_history,
+                                       path_results=self.path_results,
+                                       fig_name='/#Evals-IGD_search.jpg')
+        visualize_IGD_value_and_nEvals(IGD_history=self.IGD_search_history,
+                                       nEvals_history=self.nEvals_history,
+                                       path_results=self.path_results,
+                                       ylabel='IGD+ value',
+                                       fig_name='/#Evals-IGDp_search.jpg')
+        visualize_HV_value_and_nEvals(HV_history=self.HV_search_history,
+                                      nEvals_history=self.nEvals_history,
+                                      path_results=self.path_results,
+                                      fig_name='/#Evals-HV_search.jpg')
 
 if __name__ == '__main__':
     pass

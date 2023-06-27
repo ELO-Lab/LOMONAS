@@ -3,8 +3,13 @@ Modified from: https://github.com/msu-coinlab/pymoo
 """
 from utils import (
     set_seed,
-    ElitistArchive
+    ElitistArchive,
+    visualize_IGD_value_and_nEvals,
+    visualize_HV_value_and_nEvals,
+    visualize_Elitist_Archive_and_Pareto_Front,
 )
+import numpy as np
+import pickle as p
 
 class Algorithm:
     def __init__(self, **kwargs):
@@ -19,7 +24,7 @@ class Algorithm:
         - *pop*: the population
         - *problem*: the problem which are being solved
         - *seed*: random seed
-        - *nEvals*: the number of evaluate function calls (or the number of trained architectures (in NAS problems))
+        - *n_eval*: the number of evaluate function calls (or the number of trained architectures (in NAS problems))
         - *path_results*: the folder where the results will be saved on
         - *E_Archive*: the Elitist Archive
         """
@@ -36,12 +41,14 @@ class Algorithm:
         self.problem = None
 
         self.seed = 0
-        self.nEvals, self.nGens = 0, 0
+        self.n_eval, self.n_gen = 0, 0
 
         self.path_results = None
         self.debug = False
 
         self.E_Archive_search = ElitistArchive(log_each_change=True)
+        self.E_Archive_search_each_gen = []
+        self.E_Archive_search_history = []
         ##############################################################################
         self.start_executed_time_algorithm = 0.0
         self.finish_executed_time_algorithm = 0.0
@@ -52,6 +59,15 @@ class Algorithm:
         self.evaluated_time_history = [0.0]
         self.running_time_history = [0.0]
 
+        self.nEvals_history = []
+
+        self.E_Archive_evaluate_history = []
+        self.IGD_evaluate_history = []
+        self.IGDp_evaluate_history = []
+        self.HV_evaluate_history = []
+
+        self.E_Archive_evaluate_each_gen = []
+
     """ ---------------------------------- Setting Up ---------------------------------- """
     def set_hyperparameters(self, **kwargs):
         for key, value in kwargs.items():
@@ -61,11 +77,13 @@ class Algorithm:
         self.pop = None
 
         self.seed = 0
-        self.nEvals, self.nGens = 0, 0
+        self.n_eval, self.n_gen = 0, 0
 
         self.path_results = None
 
         self.E_Archive_search = ElitistArchive(log_each_change=True)
+        self.E_Archive_search_each_gen = []
+        self.E_Archive_search_history = []
 
         self.start_executed_time_algorithm = 0.0
         self.finish_executed_time_algorithm = 0.0
@@ -75,6 +93,15 @@ class Algorithm:
         self.indicator_time_history = [0.0]
         self.evaluated_time_history = [0.0]
         self.running_time_history = [0.0]
+
+        self.nEvals_history = []
+
+        self.E_Archive_evaluate_each_gen = []
+        self.E_Archive_evaluate_history = []
+
+        self.IGD_evaluate_history = []
+        self.IGDp_evaluate_history = []
+        self.HV_evaluate_history = []
 
         self._reset()
 
@@ -105,6 +132,8 @@ class Algorithm:
 
     """ -------------------------------- Do Each Gen -------------------------------- """
     def do_each_gen(self):
+        self.E_Archive_search_each_gen.append(self.E_Archive_search_history[-1].copy())
+        self.E_Archive_evaluate_each_gen.append(self.E_Archive_evaluate_history[-1].copy())
         self._do_each_gen()
 
     """ -------------------------------- Perform when having a new change in EA -------------------------------- """
@@ -113,6 +142,47 @@ class Algorithm:
 
     """ --------------------------------------------------- Finalize ----------------------------------------------- """
     def finalize(self):
+        p.dump([self.nEvals_history, self.IGD_evaluate_history],
+               open(f'{self.path_results}/#Evals_and_IGD.p', 'wb'))
+        p.dump([self.nEvals_history, self.IGDp_evaluate_history],
+               open(f'{self.path_results}/#Evals_and_IGDp.p', 'wb'))
+        p.dump([self.nEvals_history, self.HV_evaluate_history],
+               open(f'{self.path_results}/#Evals_and_HV.p', 'wb'))
+
+        self.running_time_history = np.array(self.running_time_history)[1:]
+        p.dump(self.running_time_history, open(f'{self.path_results}/running_time.p', 'wb'))
+
+        p.dump([self.nEvals_history, self.E_Archive_search_history],
+               open(f'{self.path_results}/#Evals_and_Elitist_Archive_search.p', 'wb'))
+        p.dump([self.nEvals_history, self.E_Archive_evaluate_history],
+               open(f'{self.path_results}/#Evals_and_Elitist_Archive_evaluate.p', 'wb'))
+
+        visualize_Elitist_Archive_and_Pareto_Front(AF=self.E_Archive_search_history[-1]['F'],
+                                                   POF=self.problem.opt_pareto_front_val,
+                                                   ylabel='Val Performance',
+                                                   xlabel=self.problem.objective_1,
+                                                   path=self.path_results,
+                                                   fig_name='AF-POF_search')
+
+        visualize_Elitist_Archive_and_Pareto_Front(AF=self.E_Archive_evaluate_history[-1]['F'],
+                                                   POF=self.problem.opt_pareto_front,
+                                                   ylabel='Test Performance',
+                                                   xlabel=self.problem.objective_1,
+                                                   path=self.path_results,
+                                                   fig_name='AF-POF')
+
+        visualize_IGD_value_and_nEvals(IGD_history=self.IGD_evaluate_history,
+                                       nEvals_history=self.nEvals_history,
+                                       path_results=self.path_results)
+        visualize_IGD_value_and_nEvals(IGD_history=self.IGD_evaluate_history,
+                                       nEvals_history=self.nEvals_history,
+                                       path_results=self.path_results,
+                                       ylabel='IGD+ value',
+                                       fig_name='#Evals-IGDp')
+        visualize_HV_value_and_nEvals(HV_history=self.HV_evaluate_history,
+                                      nEvals_history=self.nEvals_history,
+                                      path_results=self.path_results)
+
         self._finalize()
 
     """ -------------------------------------------- Abstract Methods -----------------------------------------------"""

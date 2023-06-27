@@ -2,8 +2,10 @@ import numpy as np
 import pickle as p
 from api_benchmarks.api_201.api import API
 from problems.NAS_problem import Problem
-from utils import calculate_IGD_value, get_hashKey
+from utils import get_hashKey
 from pymoo.indicators.hv import HV
+from pymoo.indicators.igd import IGD
+from pymoo.indicators.igd_plus import IGDPlus
 
 # 'none': 0
 # 'skip_connect': 1
@@ -14,7 +16,7 @@ reference_point = [1.01, 1.01]
 HV_cal = HV(reference_point)
 
 class NASBench201(Problem):
-    def __init__(self, dataset, maxEvals, **kwargs):
+    def __init__(self, dataset, max_eval, **kwargs):
         """
         # NAS-Benchmark-201 provides us the information (e.g., the training loss, the testing accuracy,
         the validation accuracy, the number of FLOPs, etc) of all architectures in the search space. Therefore, if we
@@ -30,15 +32,15 @@ class NASBench201(Problem):
         - maxLength -> the maximum length of compact architecture.
         """
 
-        super().__init__(maxEvals, 'NASBench201', dataset, **kwargs)
+        super().__init__(max_eval, 'NASBench201', dataset, **kwargs)
         self.objective_0 = 'Test Error'
         self.objective_1 = '#FLOPs'
 
         self.available_ops = [0, 1, 2, 3, 4]
         self.maxLength = 6
 
-        self.data_path = kwargs['path_api_benchmark'] + f'/NASBench201'
-        self.pareto_opt_front_path = kwargs['path_pareto_optimal_front']
+        self.path_data = kwargs['api_benchmark_path'] + f'/NASBench201'
+        self.pof_path = kwargs['pof_path']
 
         self.min_FLOPs, self.max_FLOPs = None, None
 
@@ -55,7 +57,7 @@ class NASBench201(Problem):
             raise ValueError(f'Just only supported these subsets: CIFAR-10; CIFAR-100; ImageNet16-120.'
                              f'{self.dataset} subset is not supported at this time.')
 
-        self.api = API(data_path=self.data_path, dataset=self.dataset)
+        self.api = API(path_data=self.path_data, dataset=self.dataset)
 
         if self.dataset == 'CIFAR-10':
             self.min_FLOPs, self.max_FLOPs = 7.78305, 220.11969
@@ -64,7 +66,7 @@ class NASBench201(Problem):
         else:
             self.min_FLOPs, self.max_FLOPs = 1.95340, 55.03756
 
-        f_opt_pareto_front = open(f'{self.pareto_opt_front_path}/[POF_TestAcc_FLOPs]_[NAS201_{self.dataset}].p', 'rb')
+        f_opt_pareto_front = open(f'{self.pof_path}/[POF_TestAcc_FLOPs]_[NAS201_{self.dataset}].p', 'rb')
         self.opt_pareto_front = p.load(f_opt_pareto_front)
         self.opt_pareto_front[:, 0] /= 100
         f_opt_pareto_front.close()
@@ -74,7 +76,7 @@ class NASBench201(Problem):
             (self.opt_pareto_front_norm[:, 1] - self.min_FLOPs) / (self.max_FLOPs - self.min_FLOPs), 4)
         self.opt_pareto_front_norm = np.round(self.opt_pareto_front_norm, 6)
 
-        f_opt_pareto_front_val = open(f'{self.pareto_opt_front_path}/[POF_ValAcc_FLOPs]_[NAS201_{self.dataset}].p', 'rb')
+        f_opt_pareto_front_val = open(f'{self.pof_path}/[POF_ValAcc_FLOPs]_[NAS201_{self.dataset}].p', 'rb')
         self.opt_pareto_front_val = p.load(f_opt_pareto_front_val)
         self.opt_pareto_front_val[:, 0] /= 100
         f_opt_pareto_front_val.close()
@@ -84,6 +86,11 @@ class NASBench201(Problem):
             (self.opt_pareto_front_val_norm[:, 1] - self.min_FLOPs) / (self.max_FLOPs - self.min_FLOPs), 4)
         self.opt_pareto_front_val_norm = np.round(self.opt_pareto_front_val_norm, 6)
 
+        self.IGD_calc = IGD(self.opt_pareto_front_norm)
+        self.IGD_s_calc = IGD(self.opt_pareto_front_val_norm)
+
+        self.IGDp_calc = IGDPlus(self.opt_pareto_front_norm)
+        self.IGDp_s_calc = IGDPlus(self.opt_pareto_front_val_norm)
         print('--> Set Up - Done')
 
     def _reset(self):
@@ -154,25 +161,43 @@ class NASBench201(Problem):
 
     def _calculate_IGD(self, approximation_front):
         approximation_front = np.array(approximation_front)
-        approximation_front[:, 1] = self.normalize_efficiency_metric(approximation_front[:, 1])
+        approximation_front[:, 1] = (approximation_front[:, 1] - self.min_FLOPs) / (self.max_FLOPs - self.min_FLOPs)
         approximation_front = np.round(approximation_front, 4)
         if self.opt_pareto_front is None:
             return -1
-        IGD = calculate_IGD_value(pareto_optimal_front=self.opt_pareto_front_norm, approximation_front=approximation_front)
-        return IGD
+        IGD_value = self.IGD_calc(approximation_front)
+        return IGD_value
+
+    def _calculate_IGDp(self, approximation_front):
+        approximation_front = np.array(approximation_front)
+        approximation_front[:, 1] = (approximation_front[:, 1] - self.min_FLOPs) / (self.max_FLOPs - self.min_FLOPs)
+        approximation_front = np.round(approximation_front, 4)
+        if self.opt_pareto_front is None:
+            return -1
+        IGDp_value = self.IGDp_calc(approximation_front)
+        return IGDp_value
 
     def calculate_IGD_val(self, approximation_front):
         approximation_front = np.array(approximation_front)
-        approximation_front[:, 1] = self.normalize_efficiency_metric(approximation_front[:, 1])
+        approximation_front[:, 1] = (approximation_front[:, 1] - self.min_FLOPs) / (self.max_FLOPs - self.min_FLOPs)
         approximation_front = np.round(approximation_front, 4)
         if self.opt_pareto_front_val is None:
             return -1
-        IGD = calculate_IGD_value(pareto_optimal_front=self.opt_pareto_front_val_norm, approximation_front=approximation_front)
-        return IGD
+        IGD_value = self.IGD_s_calc(approximation_front)
+        return IGD_value
+
+    def calculate_IGDp_val(self, approximation_front):
+        approximation_front = np.array(approximation_front)
+        approximation_front[:, 1] = (approximation_front[:, 1] - self.min_FLOPs) / (self.max_FLOPs - self.min_FLOPs)
+        approximation_front = np.round(approximation_front, 4)
+        if self.opt_pareto_front_val is None:
+            return -1
+        IGDp_value = self.IGDp_s_calc(approximation_front)
+        return IGDp_value
 
     def calculate_HV(self, approximation_front):
         approximation_front = np.array(approximation_front)
-        approximation_front[:, 1] = self.normalize_efficiency_metric(approximation_front[:, 1])
+        approximation_front[:, 1] = (approximation_front[:, 1] - self.min_FLOPs) / (self.max_FLOPs - self.min_FLOPs)
         approximation_front = np.round(approximation_front, 4)
 
         return np.round(HV_cal(approximation_front) / np.prod(reference_point), 6)

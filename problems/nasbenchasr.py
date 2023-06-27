@@ -2,8 +2,10 @@ import numpy as np
 import pickle as p
 from api_benchmarks.api_ASR.api import API
 from problems.NAS_problem import Problem
-from utils import calculate_IGD_value, get_hashKey
+from utils import get_hashKey
 from pymoo.indicators.hv import HV
+from pymoo.indicators.igd import IGD
+from pymoo.indicators.igd_plus import IGDPlus
 
 # 'linear': 0
 # '1x5 Conv': 1
@@ -18,7 +20,7 @@ reference_point = [1.01, 1.01]
 HV_cal = HV(reference_point)
 
 class NASBenchASR(Problem):
-    def __init__(self, dataset, maxEvals, **kwargs):
+    def __init__(self, dataset, max_eval, **kwargs):
         """
         # NAS-Benchmark-ASR provides us the information (e.g., the testing PER, the validation PER, the number of FLOPs,
         etc) of all architectures in the search space.
@@ -32,7 +34,7 @@ class NASBenchASR(Problem):
         - maxLength -> the maximum length of compact architecture.
         """
 
-        super().__init__(maxEvals, 'NASBenchASR', dataset, **kwargs)
+        super().__init__(max_eval, 'NASBenchASR', dataset, **kwargs)
         self.objective_0 = 'test_per'
         self.objective_1 = '#FLOPs'
 
@@ -44,8 +46,8 @@ class NASBenchASR(Problem):
 
         self.maxLength = 9
 
-        self.data_path = kwargs['path_api_benchmark'] + f'/NASBenchASR'
-        self.pareto_opt_front_path = kwargs['path_pareto_optimal_front']
+        self.path_data = kwargs['api_benchmark_path'] + f'/NASBenchASR'
+        self.pof_path = kwargs['pof_path']
 
         self.min_FLOPs, self.max_FLOPs = None, None
 
@@ -58,11 +60,11 @@ class NASBenchASR(Problem):
         self.efficiency_cache = {}
 
     def _set_up(self):
-        self.api = API(data_path=self.data_path, dataset=self.dataset)
+        self.api = API(path_data=self.path_data, dataset=self.dataset)
 
         self.min_FLOPs, self.max_FLOPs = 1982027266, 6968537266
 
-        f_opt_pareto_front = open(f'{self.pareto_opt_front_path}/[POF_TestPER_FLOPs]_[NAS-ASR].p', 'rb')
+        f_opt_pareto_front = open(f'{self.pof_path}/[POF_TestPER_FLOPs]_[NAS-ASR].p', 'rb')
         self.opt_pareto_front = p.load(f_opt_pareto_front)
         f_opt_pareto_front.close()
 
@@ -71,7 +73,7 @@ class NASBenchASR(Problem):
             (self.opt_pareto_front_norm[:, 1] - self.min_FLOPs) / (self.max_FLOPs - self.min_FLOPs), 4)
         self.opt_pareto_front_norm = np.round(self.opt_pareto_front_norm, 6)
 
-        f_opt_pareto_front_val = open(f'{self.pareto_opt_front_path}/[POF_ValPER_FLOPs]_[NAS-ASR].p', 'rb')
+        f_opt_pareto_front_val = open(f'{self.pof_path}/[POF_ValPER_FLOPs]_[NAS-ASR].p', 'rb')
         self.opt_pareto_front_val = p.load(f_opt_pareto_front_val)
         f_opt_pareto_front.close()
 
@@ -79,6 +81,12 @@ class NASBenchASR(Problem):
         self.opt_pareto_front_val_norm[:, 1] = np.round(
             (self.opt_pareto_front_val_norm[:, 1] - self.min_FLOPs) / (self.max_FLOPs - self.min_FLOPs), 4)
         self.opt_pareto_front_val_norm = np.round(self.opt_pareto_front_val_norm, 6)
+
+        self.IGD_calc = IGD(self.opt_pareto_front_norm)
+        self.IGD_s_calc = IGD(self.opt_pareto_front_val_norm)
+
+        self.IGDp_calc = IGDPlus(self.opt_pareto_front_norm)
+        self.IGDp_s_calc = IGDPlus(self.opt_pareto_front_val_norm)
 
         print('--> Set Up - Done')
 
@@ -162,8 +170,17 @@ class NASBenchASR(Problem):
         approximation_front = np.round(approximation_front, 4)
         if self.opt_pareto_front is None:
             return -1
-        IGD = calculate_IGD_value(pareto_optimal_front=self.opt_pareto_front_norm, approximation_front=approximation_front)
-        return IGD
+        IGD_value = self.IGD_calc(approximation_front)
+        return IGD_value
+
+    def _calculate_IGDp(self, approximation_front):
+        approximation_front = np.array(approximation_front)
+        approximation_front[:, 1] = (approximation_front[:, 1] - self.min_FLOPs) / (self.max_FLOPs - self.min_FLOPs)
+        approximation_front = np.round(approximation_front, 4)
+        if self.opt_pareto_front is None:
+            return -1
+        IGDp_value = self.IGDp_calc(approximation_front)
+        return IGDp_value
 
     def calculate_IGD_val(self, approximation_front):
         approximation_front = np.array(approximation_front)
@@ -171,8 +188,17 @@ class NASBenchASR(Problem):
         approximation_front = np.round(approximation_front, 4)
         if self.opt_pareto_front_val is None:
             return -1
-        IGD = calculate_IGD_value(pareto_optimal_front=self.opt_pareto_front_val_norm, approximation_front=approximation_front)
-        return IGD
+        IGD_value = self.IGD_s_calc(approximation_front)
+        return IGD_value
+
+    def calculate_IGDp_val(self, approximation_front):
+        approximation_front = np.array(approximation_front)
+        approximation_front[:, 1] = (approximation_front[:, 1] - self.min_FLOPs) / (self.max_FLOPs - self.min_FLOPs)
+        approximation_front = np.round(approximation_front, 4)
+        if self.opt_pareto_front_val is None:
+            return -1
+        IGDp_value = self.IGDp_s_calc(approximation_front)
+        return IGDp_value
 
     def calculate_HV(self, approximation_front):
         approximation_front = np.array(approximation_front)
